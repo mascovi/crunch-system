@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>CRUNCH — Hub Operacional (Preview)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #1f140d;
+    --panel: #2b1b10;
+    --panel-2: #382418;
+    --line: #3d2a12;
+    --line-2: #4e3818;
+    --ink: #ece7dc;
+    --ink-dim: #d8c7ae;
+    --ink-mute: #b8946b;
+    --accent: #ff6a00;
+    --accent-ink: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Geist', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 80px 32px 60px; }
+
+  /* ── HERO ─────────────────────────────── */
+  .hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 32px;
+    margin-bottom: 48px;
+  }
+  .hero-left { display: flex; align-items: center; gap: 18px; }
+  .logo {
+    width: 52px; height: 52px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 22px;
+    letter-spacing: -0.04em;
+  }
+  h1 { font-size: 36px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+  .hero p { margin: 8px 0 0; color: var(--ink-dim); font-size: 14px; }
+  .hero-spec {
+    text-align: right; font-size: 12px;
+    color: var(--ink-mute); line-height: 1.7;
+  }
+  .hero-spec b { color: var(--ink-dim); font-weight: 500; }
+
+  /* ── SECTION TITLE ────────────────────── */
+  .section-title {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 18px;
+  }
+
+  /* ── AÇÕES RÁPIDAS (3 cards) ──────────── */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 48px;
+  }
+  @media (max-width: 760px) { .actions { grid-template-columns: 1fr; } }
+
+  .action-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    text-decoration: none;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: transform .15s, border-color .15s, background .15s;
+    cursor: pointer;
+  }
+  .action-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    background: var(--panel-2);
+  }
+  .action-card:hover .arrow { transform: translateX(4px); color: var(--accent); }
+
+  .action-head {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tag {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent);
+    background: rgba(232,97,26,0.12);
+    border: 1px solid rgba(232,97,26,0.3);
+    padding: 4px 8px; border-radius: 5px;
+  }
+  .arrow {
+    font-size: 18px; color: var(--ink-mute);
+    transition: transform .15s, color .15s;
+  }
+  .action-card h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .action-card p { font-size: 13px; color: var(--ink-dim); line-height: 1.5; }
+
+  /* ── PAINEL NFs EM TRÂNSITO ───────────── */
+  .nf-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .nf-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nf-header-left { display: flex; align-items: center; gap: 10px; }
+  .pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .nf-header h3 {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .badge {
+    font-size: 10px; font-family: 'Geist Mono', monospace;
+    background: var(--panel-2); border: 1px solid var(--line-2);
+    padding: 3px 10px; border-radius: 999px;
+    color: var(--accent);
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead tr {
+    border-bottom: 1px solid var(--line);
+  }
+  th {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-mute);
+    padding: 10px 16px;
+    text-align: left;
+  }
+  th.center { text-align: center; }
+  td {
+    padding: 14px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(61,42,18,0.5);
+  }
+  tr:hover td { background: rgba(56,36,24,0.4); }
+
+  .td-mono {
+    font-family: 'Geist Mono', monospace;
+    font-size: 12px; color: var(--ink-dim);
+  }
+  .td-center { text-align: center; }
+  .td-dias { font-weight: 600; text-align: center; }
+  .dias-green { color: #4ade80; }
+  .dias-yellow { color: #facc15; }
+  .dias-red { color: #f87171; }
+
+  .btn-small {
+    display: inline-block;
+    padding: 5px 12px;
+    font-size: 11px; font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    background: transparent;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+    text-decoration: none;
+  }
+  .btn-small:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-accent {
+    background: var(--accent); color: #fff;
+    border: none; font-weight: 600;
+  }
+  .btn-accent:hover { background: #e05e00; color: #fff; }
+
+  .td-actions { display: flex; gap: 8px; justify-content: center; }
+
+  /* ── CARDS ORIGINAIS (etiquetas) ──────── */
+  .old-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 48px;
+  }
+  @media (max-width: 760px) { .old-cards { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 28px;
+    text-decoration: none;
+    color: var(--ink);
+    display: flex; flex-direction: column; gap: 16px;
+    transition: transform .15s, border-color .15s, background .15s;
+  }
+  .card:hover { transform: translateY(-2px); border-color: var(--accent); background: #382418; }
+  .card:hover .arrow { transform: translateX(4px); color: var(--accent); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; }
+
+  .card-illo {
+    height: 110px; border-radius: 10px;
+    background: var(--panel-2); border: 1px solid var(--line);
+    display: grid; place-items: center; overflow: hidden;
+  }
+  .illo-caixa-pair, .illo-prod-pair { display: flex; gap: 10px; }
+  .illo-caixa {
+    width: 92px; height: 58px;
+    background: #fff; color: #000;
+    border-radius: 2px; padding: 6px 4px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; font-size: 7px;
+    font-weight: 700; letter-spacing: 0.02em; line-height: 1.1;
+    box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  .illo-caixa .c-name { font-size: 10px; line-height: 1; }
+  .illo-caixa .c-code { font-family: 'Geist Mono', monospace; font-size: 7px; margin-top: 4px; padding-top: 3px; border-top: 1px solid #000; }
+  .illo-caixa .c-forn { font-size: 6px; letter-spacing: 0.18em; margin-top: 1px; }
+
+  .illo-prod {
+    width: 92px; height: 58px;
+    background: #fff; color: #000;
+    border-radius: 2px; padding: 5px;
+    display: flex; flex-direction: column; gap: 3px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  .illo-prod .bars {
+    height: 18px;
+    background: repeating-linear-gradient(90deg,
+      #000 0 1.5px, transparent 1.5px 3px,
+      #000 3px 6px, transparent 6px 8px,
+      #000 8px 9px, transparent 9px 11px);
+  }
+  .illo-prod .pcode { font-family: 'Geist Mono', monospace; font-size: 7px; text-align: center; }
+  .illo-prod .pdesc { font-size: 5px; line-height: 1.15; text-align: left; }
+  .illo-prod .psku { font-family: 'Geist Mono', monospace; font-size: 5px; }
+
+  .card h2 { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .card-desc { font-size: 13px; color: var(--ink-dim); line-height: 1.5; }
+  .card-foot {
+    margin-top: auto; padding-top: 6px;
+    font-size: 11px; color: var(--ink-mute);
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+  .card-foot span { display: inline-flex; align-items: center; gap: 6px; }
+  .pill {
+    padding: 2px 8px;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    color: var(--ink-dim);
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+  }
+
+  /* ── FOOTER ───────────────────────────── */
+  .footer {
+    margin-top: 52px; padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--ink-mute); line-height: 1.6;
+  }
+  .footer b { color: var(--ink-dim); font-weight: 500; }
+
+  /* ── CORNER LOGO ──────────────────────── */
+  .crunch-corner {
+    position: fixed; bottom: 20px; right: 20px;
+    width: 64px; height: 64px; border-radius: 14px;
+    background: var(--accent);
+    display: grid; place-items: center;
+    box-shadow: 0 4px 20px rgba(232,97,26,0.4);
+    z-index: 100; opacity: 0.9;
+    transition: opacity .2s, transform .2s;
+    font-weight: 700; font-size: 20px; color: #fff;
+    letter-spacing: -0.04em;
+  }
+  .crunch-corner:hover { opacity: 1; transform: scale(1.05); }
+
+  /* ── DEMO BANNER ──────────────────────── */
+  .demo-banner {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: var(--accent); color: #fff;
+    text-align: center; padding: 8px;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.04em; z-index: 200;
+  }
+</style>
+</head>
+<body>
+
+<div class="demo-banner">PREVIEW ESTÁTICO — Layout do Hub Operacional</div>
+
+<div class="wrap">
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- HERO                                -->
+  <!-- ═══════════════════════════════════ -->
+  <header class="hero">
+    <div class="hero-left">
+      <div class="logo">C</div>
+      <div>
+        <h1>CRUNCH</h1>
+        <p>Hub operacional — recebimento, estoque e FULL.</p>
+      </div>
+    </div>
+    <div class="hero-spec">
+      <div>Sistema: <b>v1.0</b></div>
+      <div>Modo: <b>Operacional</b></div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- AÇÕES RÁPIDAS                       -->
+  <!-- ═══════════════════════════════════ -->
+  <div class="section-title">Ações Rápidas</div>
+
+  <div class="actions">
+    <a class="action-card" href="#">
+      <div class="action-head">
+        <span class="tag">Upload</span>
+        <span class="arrow">&uarr;</span>
+      </div>
+      <h2>Subir XML</h2>
+      <p>Enviar XML de nota fiscal para o sistema.</p>
+    </a>
+
+    <a class="action-card" href="#">
+      <div class="action-head">
+        <span class="tag">Estoque</span>
+        <span class="arrow">&rarr;</span>
+      </div>
+      <h2>Acessar Estoque</h2>
+      <p>Visualizar saldo, movimentações e enviar FULL.</p>
+    </a>
+
+    <a class="action-card" href="#">
+      <div class="action-head">
+        <span class="tag">ZPL</span>
+        <span class="arrow">&rarr;</span>
+      </div>
+      <h2>Etiquetas</h2>
+      <p>Gerador de etiquetas ZPL para caixas e produtos.</p>
+    </a>
+  </div>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- PAINEL — NOTAS EM TRÂNSITO          -->
+  <!-- ═══════════════════════════════════ -->
+  <div class="section-title">Notas Fiscais</div>
+
+  <div class="nf-panel">
+    <div class="nf-header">
+      <div class="nf-header-left">
+        <div class="pulse"></div>
+        <h3>Notas Fiscais em Trânsito</h3>
+      </div>
+      <span class="badge">3</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="padding-left:24px">Fornecedor</th>
+          <th>NF</th>
+          <th class="center">Volumes</th>
+          <th>Faturamento</th>
+          <th class="center">Dias Úteis</th>
+          <th class="center">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding-left:24px;font-weight:500">TRUE SOURCE NUTRITION</td>
+          <td class="td-mono">184.392</td>
+          <td class="td-center" style="color:var(--ink-dim)">12</td>
+          <td style="color:var(--ink-dim)">22/05/2026</td>
+          <td class="td-dias dias-green">2d</td>
+          <td>
+            <div class="td-actions">
+              <button class="btn-small">Ver XML</button>
+              <button class="btn-small btn-accent">Entregue</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-left:24px;font-weight:500">GROWTH SUPPLEMENTS</td>
+          <td class="td-mono">91.207</td>
+          <td class="td-center" style="color:var(--ink-dim)">6</td>
+          <td style="color:var(--ink-dim)">19/05/2026</td>
+          <td class="td-dias dias-yellow">5d</td>
+          <td>
+            <div class="td-actions">
+              <button class="btn-small">Ver XML</button>
+              <button class="btn-small btn-accent">Entregue</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-left:24px;font-weight:500">MAX TITANIUM</td>
+          <td class="td-mono">7.844</td>
+          <td class="td-center" style="color:var(--ink-dim)">24</td>
+          <td style="color:var(--ink-dim)">12/05/2026</td>
+          <td class="td-dias dias-red">10d</td>
+          <td>
+            <div class="td-actions">
+              <button class="btn-small">Ver XML</button>
+              <button class="btn-small btn-accent">Entregue</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- CARDS ORIGINAIS (etiquetas)         -->
+  <!-- ═══════════════════════════════════ -->
+  <div style="margin-top:48px">
+    <div class="section-title">Etiquetas ZPL</div>
+  </div>
+
+  <div class="old-cards">
+    <a class="card" href="#">
+      <div class="card-head">
+        <span class="tag">Caixas / Estoque</span>
+        <span class="arrow">&rarr;</span>
+      </div>
+      <div class="card-illo">
+        <div class="illo-caixa-pair">
+          <div class="illo-caixa">
+            <div class="c-name">CREATINA</div>
+            <div class="c-code">ZRTB80652</div>
+            <div class="c-forn">TRUE SOURCE</div>
+          </div>
+          <div class="illo-caixa">
+            <div class="c-name">CREATINA</div>
+            <div class="c-code">ZRTB80652</div>
+            <div class="c-forn">TRUE SOURCE</div>
+          </div>
+        </div>
+      </div>
+      <h2>Etiquetas de Caixa</h2>
+      <p class="card-desc">Identificação interna das caixas de estoque com produto, código e fornecedor.</p>
+      <div class="card-foot">
+        <span class="pill">94 produtos</span>
+        <span>4 fornecedores</span>
+        <span>Auto-fit do nome</span>
+      </div>
+    </a>
+
+    <a class="card" href="#">
+      <div class="card-head">
+        <span class="tag">Produto / Anúncio</span>
+        <span class="arrow">&rarr;</span>
+      </div>
+      <div class="card-illo">
+        <div class="illo-prod-pair">
+          <div class="illo-prod">
+            <div class="bars"></div>
+            <div class="pcode">ZRTB80652</div>
+            <div class="pdesc">Creatina Monohidratada True Source 300g</div>
+            <div class="psku">SKU: 12680</div>
+          </div>
+          <div class="illo-prod">
+            <div class="bars"></div>
+            <div class="pcode">ZRTB80652</div>
+            <div class="pdesc">Creatina Monohidratada True Source 300g</div>
+            <div class="psku">SKU: 12680</div>
+          </div>
+        </div>
+      </div>
+      <h2>Etiquetas de Produto</h2>
+      <p class="card-desc">Etiquetas pré-prontas com código de barras para envio.</p>
+      <div class="card-foot">
+        <span class="pill">39 etiquetas</span>
+        <span>ZPL pré-pronto</span>
+        <span>Quantidade ajustável</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- FOOTER                              -->
+  <!-- ═══════════════════════════════════ -->
+  <div class="footer">
+    <b>Crunch Online</b> — Hub Operacional v1.0
+  </div>
+
+</div>
+
+<div class="crunch-corner">C</div>
+
+</body>
+</html>

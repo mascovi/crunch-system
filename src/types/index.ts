@@ -1,0 +1,109 @@
+// ============================================
+// TIPOS PRINCIPAIS DO SISTEMA CRUNCH
+// ============================================
+
+export interface NotaFiscal {
+  id: string
+  fornecedor: string
+  cnpj: string
+  numero_nf: string
+  data_emissao: string
+  data_upload: string
+  data_recebimento?: string
+  status: 'EM_TRANSITO' | 'ENTREGUE'
+  volumes: number
+  xml_url?: string
+}
+
+export interface ItemNF {
+  id: string
+  nf_id: string
+  codigo_ml: string
+  produto: string
+  quantidade: number
+  valor_unitario: number
+  valor_total: number
+}
+
+export interface EstoqueMovimentacao {
+  id: string
+  codigo_ml: string
+  produto: string
+  tipo: 'ENTRADA' | 'SAIDA'
+  quantidade: number
+  origem: string // 'NF_RECEBIMENTO' | 'ENVIO_FULL'
+  referencia_id: string
+  data: string
+}
+
+export interface SaldoEstoque {
+  codigo_ml: string
+  produto: string
+  quantidade_disponivel: number
+  ultima_movimentacao: string
+  fornecedor_principal: string
+}
+
+export interface EnvioFull {
+  id: string
+  data_envio: string
+  arquivo_csv?: string
+  total_itens: number
+  total_codigos: number
+}
+
+export interface EnvioFullItem {
+  id: string
+  envio_id: string
+  codigo_ml: string
+  quantidade: number
+}
+
+// ============================================
+// TIPOS DO PARSER XML
+// ============================================
+
+export interface XMLParsedNF {
+  fornecedor: string
+  cnpj: string
+  numero_nf: string
+  data_emissao: string
+  volumes: number
+  itens: XMLParsedItem[]
+}
+
+export interface XMLParsedItem {
+  codigo_ml: string
+  produto: string
+  quantidade: number
+  valor_unitario: number
+  valor_total: number
+}
+
+// ============================================
+// TIPOS DO CSV FULL
+// ============================================
+
+export interface CSVFullItem {
+  codigo_ml: string
+  quantidade: number
+}
+
+// ============================================
+// TIPOS DE RESPOSTA DA API
+// ============================================
+
+export interface ApiResponse<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+// ============================================
+// NOTA EM TRÂNSITO (com dias úteis calculados)
+// ============================================
+
+export interface NotaEmTransito extends NotaFiscal {
+  dias_uteis: number
+  itens?: ItemNF[]
+}
