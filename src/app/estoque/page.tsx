@@ -179,14 +179,14 @@ function TabEnviarFull() {
     setFileName(file.name)
     setErrors([])
 
-    Papa.parse(file, {
+    Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
         const itens: CSVFullItem[] = []
         const parseErrors: string[] = []
 
-        results.data.forEach((row: Record<string, string>, i: number) => {
+        results.data.forEach((row, i) => {
           // Procurar coluna de código ML (flexível)
           const codigoML = row['codigo_ml'] || row['Codigo ML'] || row['CODIGO_ML'] || row['CodigoML'] || row['MLB'] || ''
           const qtd = parseInt(row['quantidade'] || row['Quantidade'] || row['QUANTIDADE'] || row['qtd'] || row['QTD'] || '0', 10)
