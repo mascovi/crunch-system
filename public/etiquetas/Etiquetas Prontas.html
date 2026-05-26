@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>Etiquetas Prontas — ZPL com quantidade</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="ext-resource-dependency" content="./etiquetas-prontas.json" data-resource-id="etiquetas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #1f140d;
+    --panel: #2b1b10;
+    --panel-2: #382418;
+    --line: #262c39;
+    --line-2: #323948;
+    --ink: #ece7dc;
+    --ink-dim: #d8c7ae;
+    --ink-mute: #b8946b;
+    --accent: #ff6a00;
+    --accent-ink: #1a1a1a;
+    --ok: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Geist', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .topbar {
+    border-bottom: 1px solid var(--line);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(15,17,21,.85);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo {
+    width: 32px; height: 32px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: grid; place-items: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .title { font-weight: 600; font-size: 15px; }
+  .subtitle { font-size: 12px; color: var(--ink-dim); }
+  .topbar-spec { margin-left: auto; font-size: 12px; color: var(--ink-dim); }
+  .topbar-spec b { color: var(--ink); font-weight: 500; }
+  .nav-link {
+    margin-left: 14px;
+    color: var(--ink-dim);
+    text-decoration: none;
+    font-size: 12px;
+    padding: 6px 10px;
+    border: 1px solid var(--line-2);
+    border-radius: 7px;
+    transition: color .12s, border-color .12s;
+  }
+  .nav-link:hover { color: var(--ink); border-color: #4a5566; }
+
+  .wrap {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    min-height: calc(100vh - 61px);
+  }
+  @media (max-width: 1000px) { .wrap { grid-template-columns: 1fr; } }
+
+  .col-left {
+    border-right: 1px solid var(--line);
+    padding: 24px;
+    background: var(--panel);
+  }
+  .col-right {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .field { margin-bottom: 18px; }
+  .label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 7px;
+  }
+  .label .hint {
+    font-size: 10px;
+    color: var(--ink-mute);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+  }
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    color: var(--ink);
+    padding: 11px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .12s, background .12s;
+  }
+  select:hover, input[type="number"]:hover { border-color: #3d4658; }
+  select:focus, input[type="number"]:focus {
+    border-color: var(--accent);
+    background: #20252f;
+  }
+  select:disabled { opacity: 0.45; cursor: not-allowed; }
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='none' stroke='%239aa3b2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1l5 5 5-5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+
+  /* quantity stepper */
+  .qty {
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    gap: 0;
+  }
+  .qty button {
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+  }
+  .qty button:hover { background: #20252f; border-color: #3d4658; }
+  .qty button:active { background: #2b1b10; }
+  .qty button.minus { border-radius: 8px 0 0 8px; border-right: none; }
+  .qty button.plus  { border-radius: 0 8px 8px 0; border-left: none; }
+  .qty input {
+    border-radius: 0;
+    text-align: center;
+    font-weight: 600;
+    font-size: 16px;
+    /* hide spin buttons */
+    -moz-appearance: textfield;
+  }
+  .qty input::-webkit-outer-spin-button, .qty input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .qty-meta {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ink-mute);
+    display: flex;
+    justify-content: space-between;
+  }
+  .qty-meta b { color: var(--ink-dim); font-weight: 500; }
+
+  .preset-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .preset {
+    background: transparent;
+    border: 1px solid var(--line-2);
+    color: var(--ink-dim);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .preset:hover { background: var(--panel-2); color: var(--ink); border-color: #4a5566; }
+
+  .info-card {
+    margin-top: 22px;
+    padding: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .info-card .info-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 10px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .k { color: var(--ink-mute); }
+  .info-row .v { color: var(--ink); font-weight: 500; text-align: right; word-break: break-word; }
+  .info-row .v.code { font-family: 'Geist Mono', monospace; }
+
+  .section-h {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .section-h h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .section-h .meta { font-size: 12px; color: var(--ink-mute); }
+
+  .summary-card {
+    background: linear-gradient(180deg, #1c2230 0%, #2b1b10 100%);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 24px 28px;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+  .summary-num {
+    font-family: 'Geist', sans-serif;
+    font-size: 64px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    min-width: 100px;
+    text-align: center;
+  }
+  .summary-text { flex: 1; }
+  .summary-text .big {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+  .summary-text .small {
+    color: var(--ink-dim);
+    font-size: 13px;
+  }
+  .summary-empty {
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 14px;
+  }
+
+  .zpl-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .zpl-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .zpl-head .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+  }
+  .zpl-head .dot.idle { background: #4b5363; box-shadow: none; }
+  .zpl-head .name {
+    font-size: 12px;
+    font-weight: 500;
+    font-family: 'Geist Mono', monospace;
+  }
+  .zpl-head .spec { color: var(--ink-mute); font-size: 11px; margin-left: 6px; }
+  .copy-btn {
+    margin-left: auto;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    border-radius: 7px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform .08s, background .12s;
+  }
+  .copy-btn:hover { background: #ffe04d; }
+  .copy-btn:active { transform: translateY(1px); }
+  .copy-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .copy-btn.copied { background: var(--ok); color: #0d2515; }
+
+  pre.zpl {
+    margin: 0;
+    padding: 16px 18px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    color: #d3d8e2;
+    white-space: pre;
+    max-height: 360px;
+    overflow: auto;
+  }
+  pre.zpl .cmd { color: #ff6a00; }
+  pre.zpl .num { color: #7dd3fc; }
+  pre.zpl .data { color: #a7e8b9; }
+  pre.zpl .pq { background: rgba(255,212,0,0.15); border-radius: 3px; padding: 1px 0; }
+
+  /* ── Modal "Gerenciar etiquetas" ───────────────────────── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 9, 13, 0.7);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 100;
+    padding: 60px 20px;
+    overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 680px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.6);
+  }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .modal-head h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .modal-head .close {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid var(--line-2);
+    color: var(--ink-dim);
+    width: 30px; height: 30px;
+    border-radius: 7px;
+    font-size: 16px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modal-head .close:hover { color: var(--ink); border-color: #4a5566; }
+  .modal-body { padding: 22px; }
+  .modal-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 22px;
+  }
+  .modal-tab {
+    background: transparent;
+    border: none;
+    color: var(--ink-mute);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .modal-tab:hover { color: var(--ink-dim); }
+  .modal-tab.active {
+    color: var(--ink);
+    border-bottom-color: var(--accent);
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .form-grid .full { grid-column: 1 / -1; }
+  .form-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 6px;
+  }
+  .form-field input[type="text"], .form-field textarea {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    color: var(--ink);
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .12s;
+  }
+  .form-field input[type="text"]:focus, .form-field textarea:focus {
+    border-color: var(--accent);
+  }
+  .form-field textarea {
+    font-family: 'Geist Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 200px;
+  }
+  .form-field .hint-text {
+    font-size: 11px;
+    color: var(--ink-mute);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .btn {
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 16px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .btn:hover { border-color: #4a5566; background: #20252f; }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: #ffe04d; border-color: #ffe04d; }
+  .btn-danger { color: #f87171; border-color: #4a3030; }
+  .btn-danger:hover { background: #2a1818; border-color: #6a3030; color: #fca5a5; }
+
+  .form-msg {
+    padding: 10px 14px;
+    border-radius: 7px;
+    font-size: 13px;
+    margin-bottom: 14px;
+    display: none;
+  }
+  .form-msg.show { display: block; }
+  .form-msg.error { background: rgba(248,113,113,0.12); color: #fca5a5; border: 1px solid rgba(248,113,113,0.3); }
+  .form-msg.success { background: rgba(74,222,128,0.12); color: #86efac; border: 1px solid rgba(74,222,128,0.3); }
+
+  .custom-list { display: flex; flex-direction: column; gap: 8px; }
+  .custom-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .custom-item .ci-info { flex: 1; min-width: 0; }
+  .custom-item .ci-desc {
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .custom-item .ci-meta {
+    font-size: 11px;
+    color: var(--ink-mute);
+    margin-top: 2px;
+  }
+  .custom-item .ci-code {
+    font-family: 'Geist Mono', monospace;
+    color: var(--ink-dim);
+  }
+  .empty-list {
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--ink-mute);
+    font-size: 13px;
+    font-style: italic;
+  }
+  .io-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+  }
+  .io-row .btn { flex: 1; }
+
+  /* trash button in dropdown item / custom list */
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--line-2);
+    color: var(--ink-mute);
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: grid; place-items: center;
+    transition: all .12s;
+  }
+  .icon-btn:hover { color: #fca5a5; border-color: #6a3030; }
+
+  /* "Manage" button in topbar */
+  .manage-btn {
+    background: transparent;
+    border: 1px solid var(--line-2);
+    color: var(--ink-dim);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: all .12s;
+  }
+  .manage-btn:hover { color: var(--ink); border-color: var(--accent); }
+  .manage-btn .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-left: 6px;
+  }
+  .manage-btn .badge:empty { display: none; }
+
+  /* Mode toggle */
+  .mode-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .mode-opt {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 9px;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .mode-opt:hover { border-color: #4a5566; }
+  .mode-opt input { accent-color: var(--accent); }
+  .mode-opt:has(input:checked) {
+    border-color: var(--accent);
+    background: rgba(255,212,0,0.06);
+  }
+  .mt-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .mt-desc  { font-size: 11px; color: var(--ink-mute); margin-top: 2px; }
+
+  .zpl-empty {
+    padding: 32px;
+    text-align: center;
+    color: var(--ink-mute);
+    font-size: 13px;
+  }
+
+  .help {
+    font-size: 12px;
+    color: var(--ink-mute);
+    line-height: 1.6;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+    margin-top: 22px;
+  }
+  .help b { color: var(--ink-dim); font-weight: 500; }
+  .kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    background: var(--panel-2);
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="logo" style="background:transparent; text-decoration:none;" title="Hub"><img src="crunch logo.png" alt="Crunch Online" style="width:100%;height:100%;object-fit:contain;border-radius:8px;"></a>
+  <div>
+    <div class="title">Etiquetas de Produto <span style="color:var(--ink-mute); font-weight: 400; font-size: 12px; margin-left: 6px;">· anúncios / envio</span></div>
+    <div class="subtitle"><a href="index.html" style="color:var(--ink-dim); text-decoration: none;">↩ hub</a> · ZPL pré-pronto + quantidade</div>
+  </div>
+  <div class="topbar-spec">
+    <span>Modo: <b>ZPL fixo + ^PQ</b></span>
+  </div>
+  <a class="nav-link" href="Gerador de Etiquetas.html">Etiquetas de Caixa →</a>
+  <button class="manage-btn" id="open-manage" type="button">+ Nova etiqueta <span class="badge" id="custom-badge"></span></button>
+</div>
+
+<div class="wrap">
+  <div class="col-left">
+    <div class="field">
+      <div class="label">
+        <span>Fornecedor</span>
+        <span class="hint" id="forn-count">—</span>
+      </div>
+      <select id="sel-fornecedor">
+        <option value="">— selecione —</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <span>Produto</span>
+        <span class="hint" id="prod-count">selecione um fornecedor</span>
+      </div>
+      <select id="sel-produto" disabled>
+        <option value="">—</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <span>Quantidade total de etiquetas</span>
+        <span class="hint">deve ser par (impressas em duplas)</span>
+      </div>
+      <div class="qty">
+        <button class="minus" id="qty-minus" type="button">−</button>
+        <input type="number" id="qty-input" min="2" max="998" step="2" value="2" />
+        <button class="plus" id="qty-plus" type="button">+</button>
+      </div>
+      <div class="qty-meta">
+        <span><b id="qty-units">2</b> etiquetas</span>
+        <span><b id="qty-pairs">1</b> par na impressão</span>
+      </div>
+      <div class="preset-row">
+        <button class="preset" data-q="2">2</button>
+        <button class="preset" data-q="10">10</button>
+        <button class="preset" data-q="20">20</button>
+        <button class="preset" data-q="50">50</button>
+        <button class="preset" data-q="100">100</button>
+        <button class="preset" data-q="200">200</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <span>Margem esquerda</span>
+        <span class="hint">+<span id="margin-mm">0,5</span> mm — corrige corte na 1ª etiqueta</span>
+      </div>
+      <input type="range" id="margin-input" min="0" max="32" step="2" value="4" style="width:100%; accent-color: var(--accent);" />
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <span>Espaçamento entre etiquetas</span>
+        <span class="hint"><span id="gap-mm">0,5</span> mm</span>
+      </div>
+      <input type="range" id="gap-input" min="0" max="80" step="2" value="4" style="width:100%; accent-color: var(--accent);" />
+    </div>
+
+    <div id="info-card" class="info-card" style="display:none;">
+      <div class="info-title">Etiqueta selecionada</div>
+      <div class="info-row"><span class="k">Produto</span><span class="v" id="i-produto">—</span></div>
+      <div class="info-row"><span class="k">Código</span><span class="v code" id="i-codigo">—</span></div>
+      <div class="info-row"><span class="k">Fornecedor</span><span class="v" id="i-forn">—</span></div>
+    </div>
+
+    <div class="help">
+      <b>Como usar:</b><br>
+      1. Escolha fornecedor e produto<br>
+      2. Defina a <b>quantidade total</b> de etiquetas (sempre em números pares)<br>
+      3. Ajuste o espaçamento entre as duas etiquetas se necessário<br>
+      4. Clique em <b>Copiar ZPL</b> e cole no software de impressão<br><br>
+      A quantidade vira <span class="kbd">^PQ</span> (número de pares = total ÷ 2). O espaçamento desloca a 2ª etiqueta para a direita.
+    </div>
+  </div>
+
+  <div class="col-right">
+    <section>
+      <div class="section-h">
+        <h2>Resumo da impressão</h2>
+        <span class="meta">Confira antes de copiar</span>
+      </div>
+      <div class="summary-card" id="summary">
+        <span class="summary-empty">Selecione uma etiqueta para ver o resumo.</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-h">
+        <h2>Código ZPL</h2>
+        <span class="meta">Pronto para colar no software de impressão</span>
+      </div>
+      <div class="zpl-card">
+        <div class="zpl-head">
+          <span class="dot idle" id="zpl-dot"></span>
+          <span class="name" id="zpl-name">aguardando seleção…</span>
+          <span class="spec" id="zpl-spec"></span>
+          <button class="copy-btn" id="copy-btn" disabled>Copiar ZPL</button>
+        </div>
+        <div id="zpl-out">
+          <div class="zpl-empty">O código ZPL aparece aqui após escolher o produto e definir a quantidade.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ── Modal: gerenciar etiquetas personalizadas ─────────── -->
+<div class="modal-overlay" id="manage-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Gerenciar etiquetas personalizadas</h3>
+      <button class="close" id="close-manage" type="button">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="add" type="button">Adicionar</button>
+        <button class="modal-tab" data-tab="list" type="button">Minhas etiquetas <span id="list-count" style="color:var(--ink-mute); margin-left:4px;"></span></button>
+      </div>
+
+      <!-- Tab: Adicionar -->
+      <div class="tab-panel active" data-tab="add">
+        <div class="form-msg" id="form-msg"></div>
+
+        <div class="mode-toggle">
+          <label class="mode-opt">
+            <input type="radio" name="add-mode" value="template" checked />
+            <div>
+              <div class="mt-title">Gerar a partir do modelo</div>
+              <div class="mt-desc">Preencha os dados e o sistema monta o ZPL</div>
+            </div>
+          </label>
+          <label class="mode-opt">
+            <input type="radio" name="add-mode" value="paste" />
+            <div>
+              <div class="mt-title">Colar ZPL completo</div>
+              <div class="mt-desc">Se você já tem o código pronto</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Fornecedor</label>
+            <input type="text" id="f-forn" list="forn-datalist" placeholder="Ex: VITAFOR" autocomplete="off" />
+            <datalist id="forn-datalist"></datalist>
+          </div>
+          <div class="form-field">
+            <label>Código (Part Number)</label>
+            <input type="text" id="f-code" placeholder="Ex: LRKN08028" autocomplete="off" />
+          </div>
+          <div class="form-field full">
+            <label>Descrição do produto</label>
+            <input type="text" id="f-desc" placeholder="Ex: Propolis Verde Premium Com 60 Cápsulas Puravida Sem Sabor" autocomplete="off" />
+            <div class="hint-text">Aparece embaixo do código de barras. Acentos são suportados.</div>
+          </div>
+
+          <!-- Modo: template (padrão) -->
+          <div class="form-field full mode-template">
+            <label>SKU <span style="color:var(--ink-mute); font-weight:400; text-transform:none; letter-spacing:0;">(opcional)</span></label>
+            <input type="text" id="f-sku" placeholder="Ex: 3000000146-crunch" autocomplete="off" />
+            <div class="hint-text">Aparece no rodapé como "SKU: ...". Deixe em branco se não usa.</div>
+          </div>
+
+          <!-- Modo: paste -->
+          <div class="form-field full mode-paste" style="display:none;">
+            <label>Código ZPL completo</label>
+            <textarea id="f-zpl" placeholder="^XA^CI28&#10;^LH0,0&#10;... cole aqui o ZPL completo da etiqueta (par) ...&#10;^XZ" spellcheck="false"></textarea>
+            <div class="hint-text">
+              Cole o ZPL completo da etiqueta dupla (deve começar com <span style="background:var(--panel-2);padding:1px 6px;border-radius:4px;font-family:'Geist Mono',monospace;font-size:11px;border:1px solid var(--line-2);">^XA</span> e terminar com <span style="background:var(--panel-2);padding:1px 6px;border-radius:4px;font-family:'Geist Mono',monospace;font-size:11px;border:1px solid var(--line-2);">^XZ</span>).
+            </div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" id="clear-form" type="button">Limpar</button>
+          <button class="btn btn-primary" id="save-label" type="button">Salvar etiqueta</button>
+        </div>
+      </div>
+
+      <!-- Tab: Minhas etiquetas -->
+      <div class="tab-panel" data-tab="list">
+        <div class="custom-list" id="custom-list">
+          <div class="empty-list">Nenhuma etiqueta personalizada ainda.</div>
+        </div>
+        <div class="io-row">
+          <button class="btn" id="export-json" type="button">↓ Exportar backup</button>
+          <button class="btn" id="import-json" type="button">↑ Importar backup</button>
+          <input type="file" id="import-file" accept=".json,application/json" style="display:none;" />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="prontas.js"></script>
+</body>
+</html>

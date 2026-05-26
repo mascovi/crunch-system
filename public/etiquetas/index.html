@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>ETIQUETA CAIXA — Hub</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #1f140d;
+    --panel: #2b1b10;
+    --panel-2: #382418;
+    --line: #3d2a12;
+    --line-2: #4e3818;
+    --ink: #ece7dc;
+    --ink-dim: #d8c7ae;
+    --ink-mute: #b8946b;
+    --accent: #ff6a00;
+    --accent-ink: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Geist', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 80px 32px 60px;
+  }
+
+  .hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 32px;
+    margin-bottom: 48px;
+  }
+  .hero-left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .logo {
+    width: 52px; height: 52px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: grid; place-items: center;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.04em;
+    overflow: hidden;
+    padding: 0;
+  }
+  .logo svg { width: 100%; height: 100%; }
+  h1 {
+    margin: 0;
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .hero p {
+    margin: 8px 0 0;
+    color: var(--ink-dim);
+    font-size: 14px;
+  }
+  .hero-spec {
+    text-align: right;
+    font-size: 12px;
+    color: var(--ink-mute);
+    line-height: 1.7;
+  }
+  .hero-spec b { color: var(--ink-dim); font-weight: 500; }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 18px;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 28px;
+    text-decoration: none;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .15s, border-color .15s, background .15s;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    background: #382418;
+  }
+  .card:hover .arrow { transform: translateX(4px); color: var(--accent); }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-tag {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: rgba(232,97,26,0.12);
+    border: 1px solid rgba(232,97,26,0.3);
+    padding: 4px 8px;
+    border-radius: 5px;
+  }
+  .arrow {
+    font-size: 18px;
+    color: var(--ink-mute);
+    transition: transform .15s, color .15s;
+  }
+
+  .card-illo {
+    height: 110px;
+    border-radius: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    position: relative;
+  }
+  /* illo: caixa */
+  .illo-caixa-pair {
+    display: flex;
+    gap: 10px;
+  }
+  .illo-caixa {
+    width: 92px;
+    height: 58px;
+    background: #fff;
+    color: #000;
+    border-radius: 2px;
+    padding: 6px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.1;
+    box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  .illo-caixa .c-name { font-size: 10px; line-height: 1; }
+  .illo-caixa .c-code { font-family: 'Geist Mono', monospace; font-size: 7px; margin-top: 4px; padding-top: 3px; border-top: 1px solid #000; }
+  .illo-caixa .c-forn { font-size: 6px; letter-spacing: 0.18em; margin-top: 1px; }
+  /* illo: produto (barcode + texto) */
+  .illo-prod-pair { display: flex; gap: 10px; }
+  .illo-prod {
+    width: 92px;
+    height: 58px;
+    background: #fff;
+    color: #000;
+    border-radius: 2px;
+    padding: 5px 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  .illo-prod .bars {
+    height: 18px;
+    background: repeating-linear-gradient(90deg,
+      #000 0 1.5px, transparent 1.5px 3px,
+      #000 3px 6px, transparent 6px 8px,
+      #000 8px 9px, transparent 9px 11px);
+  }
+  .illo-prod .pcode { font-family: 'Geist Mono', monospace; font-size: 7px; text-align: center; }
+  .illo-prod .pdesc {
+    font-size: 5px;
+    line-height: 1.15;
+    text-align: left;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+  }
+  .illo-prod .psku { font-family: 'Geist Mono', monospace; font-size: 5px; }
+
+  h2 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .card-desc {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-dim);
+    line-height: 1.5;
+  }
+  .card-foot {
+    margin-top: auto;
+    padding-top: 6px;
+    font-size: 11px;
+    color: var(--ink-mute);
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .card-foot span { display: inline-flex; align-items: center; gap: 6px; }
+  .card-foot .pill {
+    padding: 2px 8px;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    color: var(--ink-dim);
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+  }
+
+  .footer {
+    margin-top: 52px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--ink-mute);
+    line-height: 1.6;
+  }
+  .footer b { color: var(--ink-dim); font-weight: 500; }
+
+  /* Crunch Online corner logo */
+  .crunch-corner {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    background: #ff6a00;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 4px 20px rgba(232,97,26,0.4);
+    z-index: 100;
+    opacity: 0.9;
+    transition: opacity .2s, transform .2s;
+  }
+  .crunch-corner:hover { opacity: 1; transform: scale(1.05); }
+  .crunch-corner svg { width: 48px; height: 48px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-left">
+      <div class="logo" style="background:transparent;"><img src="crunch logo.png" alt="Crunch Online" style="width:100%;height:100%;object-fit:contain;border-radius:8px;"></div>
+      <div>
+        <h1>ETIQUETA CAIXA</h1>
+        <p>Sistema interno de geração de ZPL para etiquetas térmicas.</p>
+      </div>
+    </div>
+    <div class="hero-spec">
+      <div>Formato: <b>40 × 25 mm</b></div>
+      <div>Layout: <b>etiqueta dupla</b></div>
+      <div>Resolução: <b>203 DPI</b></div>
+    </div>
+  </header>
+
+  <div class="section-title">Selecione o tipo de etiqueta</div>
+
+  <div class="cards">
+    <a class="card" href="Gerador de Etiquetas.html">
+      <div class="card-head">
+        <span class="card-tag">Caixas / Estoque</span>
+        <span class="arrow">→</span>
+      </div>
+      <div class="card-illo">
+        <div class="illo-caixa-pair">
+          <div class="illo-caixa">
+            <div class="c-name">CREATINA</div>
+            <div class="c-code">ZRTB80652</div>
+            <div class="c-forn">TRUE SOURCE</div>
+          </div>
+          <div class="illo-caixa">
+            <div class="c-name">CREATINA</div>
+            <div class="c-code">ZRTB80652</div>
+            <div class="c-forn">TRUE SOURCE</div>
+          </div>
+        </div>
+      </div>
+      <h2>Etiquetas de Caixa</h2>
+      <p class="card-desc">Identificação interna das caixas de estoque com produto, código e fornecedor. ZPL gerado dinamicamente.</p>
+      <div class="card-foot">
+        <span class="pill">94 produtos</span>
+        <span>4 fornecedores</span>
+        <span>Auto-fit do nome</span>
+      </div>
+    </a>
+
+    <a class="card" href="Etiquetas Prontas.html">
+      <div class="card-head">
+        <span class="card-tag">Produto / Anúncio</span>
+        <span class="arrow">→</span>
+      </div>
+      <div class="card-illo">
+        <div class="illo-prod-pair">
+          <div class="illo-prod">
+            <div class="bars"></div>
+            <div class="pcode">ZRTB80652</div>
+            <div class="pdesc">Creatina Monohidratada True Source 300g</div>
+            <div class="psku">SKU: 12680</div>
+          </div>
+          <div class="illo-prod">
+            <div class="bars"></div>
+            <div class="pcode">ZRTB80652</div>
+            <div class="pdesc">Creatina Monohidratada True Source 300g</div>
+            <div class="psku">SKU: 12680</div>
+          </div>
+        </div>
+      </div>
+      <h2>Etiquetas de Produto</h2>
+      <p class="card-desc">Etiquetas pré-prontas (com código de barras) para envio. Escolha o produto e a quantidade total.</p>
+      <div class="card-foot">
+        <span class="pill">39 etiquetas</span>
+        <span>ZPL pré-pronto</span>
+        <span>Quantidade ajustável</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="footer">
+    <b>Como usar:</b> escolha o tipo de etiqueta acima, selecione o produto e copie o ZPL gerado para o software de impressão.
+  </div>
+</div>
+
+<div class="crunch-corner" style="background:transparent;box-shadow:none;"><img src="crunch logo.png" alt="Crunch Online" style="width:100%;height:100%;object-fit:contain;"></div>
+</body>
+</html>

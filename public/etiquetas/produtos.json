@@ -1,0 +1,660 @@
+[
+  {
+    "item": "1",
+    "descricao": "BT GEL BETERRABA",
+    "fornecedor": "DOBRO",
+    "codigo": "FTTC79259",
+    "variacao": "BET, LIMÃO E CAFEÍNA"
+  },
+  {
+    "item": "2",
+    "descricao": "CARBS GEL",
+    "fornecedor": "DOBRO",
+    "codigo": "JMIE79445",
+    "variacao": "NEUTRO FRESH"
+  },
+  {
+    "item": "3",
+    "descricao": "BT NITRATO PÓ",
+    "fornecedor": "DOBRO",
+    "codigo": "BILB12871",
+    "variacao": "RED BERRY"
+  },
+  {
+    "item": "4",
+    "descricao": "BT GEL LIMÃO GENGIBRE",
+    "fornecedor": "DOBRO",
+    "codigo": "RABL13017",
+    "variacao": "LIMÃO E GENGIBRE"
+  },
+  {
+    "item": "5",
+    "descricao": "HIDRA FRUTAS VERMELHAS",
+    "fornecedor": "DOBRO",
+    "codigo": "AIOW99135",
+    "variacao": "FRUTAS VERMELHAS"
+  },
+  {
+    "item": "6",
+    "descricao": "BT NITRATO AÇAÍ",
+    "fornecedor": "DOBRO",
+    "codigo": "YMDS97657",
+    "variacao": "450GR AÇAI"
+  },
+  {
+    "item": "7",
+    "descricao": "COLLAGEN BERRIES",
+    "fornecedor": "PURAVIDA",
+    "codigo": "VCEL30688",
+    "variacao": "BERRIES"
+  },
+  {
+    "item": "8",
+    "descricao": "COLLAGEN NEUTRO",
+    "fornecedor": "PURAVIDA",
+    "codigo": "SMRL62029",
+    "variacao": "NEUTRO"
+  },
+  {
+    "item": "9",
+    "descricao": "D3 SYNERGY",
+    "fornecedor": "PURAVIDA",
+    "codigo": "IYST07858",
+    "variacao": "60 CAPS"
+  },
+  {
+    "item": "10",
+    "descricao": "LINGUA DE GATO",
+    "fornecedor": "PURAVIDA",
+    "codigo": "GBVD44578",
+    "variacao": "LINGUA DE GATO"
+  },
+  {
+    "item": "11",
+    "descricao": "OMEGA 3 AROMA LIMÃO",
+    "fornecedor": "PURAVIDA",
+    "codigo": "GZFD33923",
+    "variacao": "AROMA LIMÃO 120CAPS"
+  },
+  {
+    "item": "12",
+    "descricao": "PRÓPOLIS VERDE",
+    "fornecedor": "PURAVIDA",
+    "codigo": "LRKN08028",
+    "variacao": "60 CAPS"
+  },
+  {
+    "item": "13",
+    "descricao": "SUPER OMEGA 3 DHA",
+    "fornecedor": "PURAVIDA",
+    "codigo": "KGLE40277",
+    "variacao": "SEM SABOR 120CAPS"
+  },
+  {
+    "item": "14",
+    "descricao": "TRIMAG",
+    "fornecedor": "PURAVIDA",
+    "codigo": "DSZJ08000",
+    "variacao": "60 CAPS"
+  },
+  {
+    "item": "15",
+    "descricao": "VIT C",
+    "fornecedor": "PURAVIDA",
+    "codigo": "SMNX61894",
+    "variacao": "60 CAPS"
+  },
+  {
+    "item": "16",
+    "descricao": "COQUETELEIRA BRANCA",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "YBJP42287",
+    "variacao": "600 ML BRANCA"
+  },
+  {
+    "item": "17",
+    "descricao": "COLAGEN PROTEIN CHOC",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "YBHQ35874",
+    "variacao": "450GR CHOCO BELGA"
+  },
+  {
+    "item": "18",
+    "descricao": "COLAGEN PROTEIN RED BERRIES",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "RJPN42793",
+    "variacao": "450GR RED BERRIES"
+  },
+  {
+    "item": "19",
+    "descricao": "COQUETELEIRA PRETA",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "QVAI42078",
+    "variacao": "600 ML PRETA"
+  },
+  {
+    "item": "20",
+    "descricao": "CREATINA",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "ZRTB80652",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "21",
+    "descricao": "CREATINA TRUE 300G.",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "ZRTB80652",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "22",
+    "descricao": "DHA LIQUIDO LARANJA",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "FEDW75462",
+    "variacao": "LARANJA"
+  },
+  {
+    "item": "23",
+    "descricao": "LIQUID IRON PLUS",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "BVHQ62334",
+    "variacao": "NATURAL/MORANGO"
+  },
+  {
+    "item": "24",
+    "descricao": "MAGNESIO 3.0 CAPIM LIMÃO",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "YTRQ55955",
+    "variacao": "CAPIM L/HORTELÃ E ERVA-DOCE"
+  },
+  {
+    "item": "25",
+    "descricao": "MAGNESIO 3.0 LARANJA & CAMOMILA",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "STUW93194",
+    "variacao": "LARANJA & CAMOMILA"
+  },
+  {
+    "item": "26",
+    "descricao": "MAGNESIO 3.0 MARACUJA",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "QHWO92203",
+    "variacao": "MARACUJA"
+  },
+  {
+    "item": "27",
+    "descricao": "NAC TRUE SOURCE",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "DDQN39019",
+    "variacao": "600MG SEM SABOR"
+  },
+  {
+    "item": "28",
+    "descricao": "OMEGA+CURCUMA",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "GVEN82018",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "29",
+    "descricao": "TRUE CURCUMA",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "OKYI81336",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "30",
+    "descricao": "TRUE OMEGA 3 180 CAPS",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "ARLJ79743",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "31",
+    "descricao": "TRUE OMEGA 3 60 CAPS",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "YJIH11384",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "32",
+    "descricao": "TRUE VITAMINA C",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "TDZB58581",
+    "variacao": "1000MG 180 CAPS"
+  },
+  {
+    "item": "33",
+    "descricao": "TRUE WHEY ADVANCED CREAMY CHOCOLATE",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "QZFH96077",
+    "variacao": "CREAMY CHOCOLATE"
+  },
+  {
+    "item": "34",
+    "descricao": "TRUE WHEY ADVANCED RED BERRIES",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "DYLI28254",
+    "variacao": "RED BERRIES"
+  },
+  {
+    "item": "35",
+    "descricao": "TRUE WHEY ADVANCED VANILLA ICE CREAM",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "TVKG96083",
+    "variacao": "VANILLA ICE CREAM"
+  },
+  {
+    "item": "36",
+    "descricao": "TRUE WHEY CHOC COM AVELÃ",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "CATI62249",
+    "variacao": "CHOC COM AVELÃ"
+  },
+  {
+    "item": "37",
+    "descricao": "TRUE WHEY DARK CHOC",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "VIST29084",
+    "variacao": "DARK CHOCOLATE"
+  },
+  {
+    "item": "38",
+    "descricao": "TRUE WHEY FIOR DI LATTE",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "FTTC36288",
+    "variacao": "FLOR DI LATTE"
+  },
+  {
+    "item": "39",
+    "descricao": "TRUE WHEY YUMMY MILK",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "JDRB58974",
+    "variacao": "YUMMY MILK"
+  },
+  {
+    "item": "40",
+    "descricao": "VITAMINA D LÍQUIDO",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "DTIN27987",
+    "variacao": "BABY KIDS FRAMBOESA"
+  },
+  {
+    "item": "41",
+    "descricao": "WHEY VEGAN BANOFFEE CRISP",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "SEIC80407",
+    "variacao": "BANOFFEE CRISP"
+  },
+  {
+    "item": "42",
+    "descricao": "WHEY VEGAN CHOC AVELÃ",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "LUKW80917",
+    "variacao": "CHOC AVELÃ"
+  },
+  {
+    "item": "43",
+    "descricao": "WHEY VEGAN CHOCOL + COCO",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "YDDW81835",
+    "variacao": "CHOCOL + COCO"
+  },
+  {
+    "item": "44",
+    "descricao": "WHEY VEGAN DOCE DE LEITE",
+    "fornecedor": "TRUE SOURCE",
+    "codigo": "BDKS07675",
+    "variacao": "DOCE DE LEITE"
+  },
+  {
+    "item": "45",
+    "descricao": "COENZIMA Q10 200MG + VIT E | COQ-10",
+    "fornecedor": "VITAFOR",
+    "codigo": "PFAW40709",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "46",
+    "descricao": "COLAGENTEK MORANGO",
+    "fornecedor": "VITAFOR",
+    "codigo": "NYZA98531",
+    "variacao": "MORANGO"
+  },
+  {
+    "item": "47",
+    "descricao": "COLAGENTEK NEUTRO",
+    "fornecedor": "VITAFOR",
+    "codigo": "THIA26463",
+    "variacao": "NEUTRO"
+  },
+  {
+    "item": "48",
+    "descricao": "COLAGENTEK PROTEIN CACAU",
+    "fornecedor": "VITAFOR",
+    "codigo": "GFUV17997",
+    "variacao": "CACAU"
+  },
+  {
+    "item": "49",
+    "descricao": "COLAGENTEK PROTEIN MORANGO",
+    "fornecedor": "VITAFOR",
+    "codigo": "NYZA98531",
+    "variacao": "MORANGO"
+  },
+  {
+    "item": "50",
+    "descricao": "COLAGENTEK PROTEIN NEUTRO",
+    "fornecedor": "VITAFOR",
+    "codigo": "THIA26463",
+    "variacao": "NEUTRO"
+  },
+  {
+    "item": "51",
+    "descricao": "COLAGENTEK TIPO 2",
+    "fornecedor": "VITAFOR",
+    "codigo": "CKGP46497",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "52",
+    "descricao": "COQUETELEIRA PRÉ-TREINO",
+    "fornecedor": "VITAFOR",
+    "codigo": "LAVI72472",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "53",
+    "descricao": "CREAFORT",
+    "fornecedor": "VITAFOR",
+    "codigo": "DMQG96737",
+    "variacao": "600Ml"
+  },
+  {
+    "item": "54",
+    "descricao": "CREATINA 100% POUCH",
+    "fornecedor": "VITAFOR",
+    "codigo": "JJHC60651",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "55",
+    "descricao": "CREATINE",
+    "fornecedor": "VITAFOR",
+    "codigo": "ZRST41705",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "56",
+    "descricao": "CURCUMA PLUS",
+    "fornecedor": "VITAFOR",
+    "codigo": "CCFJ46957",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "57",
+    "descricao": "ENZYFOR",
+    "fornecedor": "VITAFOR",
+    "codigo": "KGLE32758",
+    "variacao": "NO FLAVOR"
+  },
+  {
+    "item": "58",
+    "descricao": "FERRO + VIT C",
+    "fornecedor": "VITAFOR",
+    "codigo": "TUHW45726",
+    "variacao": "30 CAPS"
+  },
+  {
+    "item": "59",
+    "descricao": "GLUTAMAX",
+    "fornecedor": "VITAFOR",
+    "codigo": "LGSE88543",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "60",
+    "descricao": "IMUNOMULT 120",
+    "fornecedor": "VITAFOR",
+    "codigo": "DVFM93333",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "61",
+    "descricao": "ISOCRISP PLANT REFIL",
+    "fornecedor": "VITAFOR",
+    "codigo": "PFHA82189",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "62",
+    "descricao": "ISOCRISP PLANT VEGAN",
+    "fornecedor": "VITAFOR",
+    "codigo": "GIPU69453",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "63",
+    "descricao": "ISOCRISP WHEY REFIL",
+    "fornecedor": "VITAFOR",
+    "codigo": "IKDA88660",
+    "variacao": "SEM SABOR"
+  },
+  {
+    "item": "64",
+    "descricao": "ISOFORT PLANT BANANA CANELA",
+    "fornecedor": "VITAFOR",
+    "codigo": "BADP82189",
+    "variacao": "BANANA CANELA"
+  },
+  {
+    "item": "65",
+    "descricao": "ISOFORT PLANT BAUNILHA",
+    "fornecedor": "VITAFOR",
+    "codigo": "UHCZ82039",
+    "variacao": "BAUNILHA"
+  },
+  {
+    "item": "66",
+    "descricao": "ISOFORT PLANT CACAU",
+    "fornecedor": "VITAFOR",
+    "codigo": "PCBV68779",
+    "variacao": "CACAU"
+  },
+  {
+    "item": "67",
+    "descricao": "ISOFORT PLANT PAÇOCA",
+    "fornecedor": "VITAFOR",
+    "codigo": "PHOI00179",
+    "variacao": "PAÇOCA"
+  },
+  {
+    "item": "68",
+    "descricao": "MAGNÉSIO PLUS",
+    "fornecedor": "VITAFOR",
+    "codigo": "SGDW01580",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "69",
+    "descricao": "MELATONINA LÍQUIDA",
+    "fornecedor": "VITAFOR",
+    "codigo": "ZIYP32151",
+    "variacao": "GOTAS MENTA"
+  },
+  {
+    "item": "70",
+    "descricao": "NAC 60",
+    "fornecedor": "VITAFOR",
+    "codigo": "CQNX70788",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "71",
+    "descricao": "OMEGAFOR PLUS",
+    "fornecedor": "VITAFOR",
+    "codigo": "DKOT13671",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "72",
+    "descricao": "OMEGAMEMORY",
+    "fornecedor": "VITAFOR",
+    "codigo": "UHLS31160",
+    "variacao": "CÁPSULAS"
+  },
+  {
+    "item": "73",
+    "descricao": "RESVERATROL",
+    "fornecedor": "VITAFOR",
+    "codigo": "ZXCF69495",
+    "variacao": "COMPRIMIDO"
+  },
+  {
+    "item": "74",
+    "descricao": "SIMFORT G2",
+    "fornecedor": "VITAFOR",
+    "codigo": "VJJA83510",
+    "variacao": "SACHÊS"
+  },
+  {
+    "item": "75",
+    "descricao": "SIMFORT PLUS",
+    "fornecedor": "VITAFOR",
+    "codigo": "UHMY34904",
+    "variacao": "SACHÊS"
+  },
+  {
+    "item": "76",
+    "descricao": "TERMO FRUTAS VERM",
+    "fornecedor": "VITAFOR",
+    "codigo": "IVBM32534",
+    "variacao": "FRUTAS VERM. C GENGIBRE"
+  },
+  {
+    "item": "77",
+    "descricao": "TERMO TANG CHÁ VERDE",
+    "fornecedor": "VITAFOR",
+    "codigo": "KGNQ31658",
+    "variacao": "TANGERINA CHÁ VERDE"
+  },
+  {
+    "item": "78",
+    "descricao": "V-COFFEE ENERGY",
+    "fornecedor": "VITAFOR",
+    "codigo": "IOAN32114",
+    "variacao": "ORIGINAL FLAVOR"
+  },
+  {
+    "item": "79",
+    "descricao": "V-FORT LIMÃO",
+    "fornecedor": "VITAFOR",
+    "codigo": "BLVH82221",
+    "variacao": "LIMÃO"
+  },
+  {
+    "item": "80",
+    "descricao": "V-FORT UVA",
+    "fornecedor": "VITAFOR",
+    "codigo": "UMLY82459",
+    "variacao": "UVA"
+  },
+  {
+    "item": "81",
+    "descricao": "VITA D3 D3",
+    "fornecedor": "VITAFOR",
+    "codigo": "ALWO97425",
+    "variacao": "D3"
+  },
+  {
+    "item": "82",
+    "descricao": "VITAFOR AMINOVITA LIMÃO",
+    "fornecedor": "VITAFOR",
+    "codigo": "PJZI64173",
+    "variacao": "LIMÃO"
+  },
+  {
+    "item": "83",
+    "descricao": "VITAFOR AMINOVITA MARACUJÁ",
+    "fornecedor": "VITAFOR",
+    "codigo": "MRCW65089",
+    "variacao": "MARACUJÁ"
+  },
+  {
+    "item": "84",
+    "descricao": "WHEY ISOFORT BAUNILHA",
+    "fornecedor": "VITAFOR",
+    "codigo": "HXUZ33324",
+    "variacao": "BAUNILHA"
+  },
+  {
+    "item": "85",
+    "descricao": "WHEY ISOFORT CHOCOLATE",
+    "fornecedor": "VITAFOR",
+    "codigo": "LUBD34498",
+    "variacao": "CHOCOLATE"
+  },
+  {
+    "item": "86",
+    "descricao": "WHEY ISOFORT FRUTAS VERMELHAS",
+    "fornecedor": "VITAFOR",
+    "codigo": "XMJQ33722",
+    "variacao": "FRUTAS VERMELHAS"
+  },
+  {
+    "item": "87",
+    "descricao": "WHEY POUCH BAUNILHA",
+    "fornecedor": "VITAFOR",
+    "codigo": "KKBI54084",
+    "variacao": "BAUNILHA"
+  },
+  {
+    "item": "88",
+    "descricao": "WHEY POUCH BEIJINHO",
+    "fornecedor": "VITAFOR",
+    "codigo": "YSYP53558",
+    "variacao": "BEIJINHO"
+  },
+  {
+    "item": "89",
+    "descricao": "WHEY POUCH MORANGO",
+    "fornecedor": "VITAFOR",
+    "codigo": "JIIK53267",
+    "variacao": "MORANGO"
+  },
+  {
+    "item": "90",
+    "descricao": "WHEYFORT BAUNILHA",
+    "fornecedor": "VITAFOR",
+    "codigo": "YIZC03861",
+    "variacao": "BAUNILHA"
+  },
+  {
+    "item": "91",
+    "descricao": "WHEYFORT CHOCOLATE",
+    "fornecedor": "VITAFOR",
+    "codigo": "WDTH03835",
+    "variacao": "CHOCOLATE"
+  },
+  {
+    "item": "92",
+    "descricao": "WHEYFORT PAÇOCA",
+    "fornecedor": "VITAFOR",
+    "codigo": "MIBJ93125",
+    "variacao": "PAÇOCA"
+  },
+  {
+    "item": "93",
+    "descricao": "WHEYFORT 3W PREMIUM BAUNILHA",
+    "fornecedor": "VITAFOR",
+    "codigo": "STWI71794",
+    "variacao": "BAUNILHA 1,8Kg"
+  },
+  {
+    "item": "94",
+    "descricao": "WHEYFORT 3W PREMIUM CHOCOLATE",
+    "fornecedor": "VITAFOR",
+    "codigo": "BOJO68780",
+    "variacao": "CHOCOLATE 1,8Kg"
+  }
+]

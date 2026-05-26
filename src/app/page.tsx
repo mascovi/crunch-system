@@ -78,8 +78,8 @@ export default function HubPage() {
         </Link>
 
         {/* Card Etiquetas (link original) */}
-        <Link
-          href="/etiquetas"
+        <a
+          href="/etiquetas/index.html"
           className="group bg-crunch-panel border border-crunch-line rounded-2xl p-6 hover:border-crunch-accent hover:bg-crunch-panel-2 transition-all hover:-translate-y-0.5"
         >
           <div className="flex items-center justify-between mb-4">
@@ -94,7 +94,7 @@ export default function HubPage() {
           <p className="text-xs text-crunch-ink-dim leading-relaxed">
             Gerador de etiquetas ZPL para caixas e produtos.
           </p>
-        </Link>
+        </a>
       </div>
 
       {/* ============================================ */}

@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>Gerador de Etiquetas — ZPL 40×25mm dupla</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #1f140d;
+    --panel: #2b1b10;
+    --panel-2: #382418;
+    --line: #262c39;
+    --line-2: #323948;
+    --ink: #ece7dc;
+    --ink-dim: #d8c7ae;
+    --ink-mute: #b8946b;
+    --accent: #ff6a00;
+    --accent-ink: #1a1a1a;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Geist', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  .mono { font-family: 'Geist Mono', ui-monospace, monospace; }
+
+  /* ── Topbar ─────────────────────────────────────────────── */
+  .topbar {
+    border-bottom: 1px solid var(--line);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(15,17,21,.85);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo {
+    width: 32px; height: 32px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: grid; place-items: center;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.02em;
+  }
+  .title { font-weight: 600; letter-spacing: -0.01em; font-size: 15px; }
+  .subtitle { font-size: 12px; color: var(--ink-dim); }
+  .topbar-spec {
+    margin-left: auto;
+    display: flex;
+    gap: 18px;
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  .topbar-spec b { color: var(--ink); font-weight: 500; }
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  .wrap {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 61px);
+  }
+  @media (max-width: 1000px) {
+    .wrap { grid-template-columns: 1fr; }
+  }
+
+  .col-left {
+    border-right: 1px solid var(--line);
+    padding: 24px;
+    background: var(--panel);
+  }
+  .col-right {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* ── Form ───────────────────────────────────────────────── */
+  .field { margin-bottom: 18px; }
+  .label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 7px;
+  }
+  .label .hint {
+    font-size: 10px;
+    color: var(--ink-mute);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+  }
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    color: var(--ink);
+    padding: 11px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .12s, background .12s;
+  }
+  select:hover, input[type="number"]:hover { border-color: #3d4658; }
+  select:focus, input[type="number"]:focus {
+    border-color: var(--accent);
+    background: #20252f;
+  }
+  select:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='none' stroke='%239aa3b2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1l5 5 5-5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .info-card {
+    margin-top: 22px;
+    padding: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .info-card .info-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 10px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .k { color: var(--ink-mute); }
+  .info-row .v { color: var(--ink); font-weight: 500; text-align: right; }
+  .info-row .v.code { font-family: 'Geist Mono', monospace; }
+
+  /* ── Section heading ────────────────────────────────────── */
+  .section-h {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .section-h h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .section-h .meta {
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  /* ── Preview ────────────────────────────────────────────── */
+  .preview-stage {
+    background:
+      linear-gradient(45deg, #14171d 25%, transparent 25%),
+      linear-gradient(-45deg, #14171d 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #14171d 75%),
+      linear-gradient(-45deg, transparent 75%, #14171d 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    background-color: #0a0c10;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 36px 28px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 240px;
+  }
+
+  /* Each label: 40mm × 25mm. Render at 5× = 200×125 px */
+  .etiqueta-pair {
+    display: flex;
+    gap: 12px; /* gap entre as duas etiquetas (~2.4mm visual) */
+    align-items: stretch;
+  }
+  .etiqueta {
+    width: 200px;
+    height: 125px;
+    background: #ffffff;
+    color: #000;
+    border-radius: 2px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.35);
+    padding: 7px 8px;
+    display: grid;
+    grid-template-rows: 1fr auto auto;
+    align-items: center;
+    text-align: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .etiqueta .l-produto {
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    align-self: center;
+    text-wrap: balance;
+    font-family: 'Geist', sans-serif;
+  }
+  .etiqueta .l-codigo {
+    font-family: 'Geist Mono', monospace;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin-top: 2px;
+    padding-top: 4px;
+    border-top: 1px solid #000;
+  }
+  .etiqueta .l-forn {
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #000;
+    margin-top: 1px;
+  }
+  .etiqueta-empty {
+    color: #b8b8b8;
+    font-style: italic;
+    font-weight: 400;
+    align-self: center;
+    grid-row: 1 / -1;
+    font-size: 12px;
+  }
+
+  .scale-bar {
+    margin-top: 14px;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    font-size: 11px;
+    color: var(--ink-mute);
+  }
+  .scale-bar span b { color: var(--ink-dim); font-weight: 500; }
+
+  /* ── ZPL output ─────────────────────────────────────────── */
+  .zpl-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .zpl-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .zpl-head .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+  }
+  .zpl-head .dot.idle { background: #4b5363; box-shadow: none; }
+  .zpl-head .name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink);
+    font-family: 'Geist Mono', monospace;
+  }
+  .zpl-head .spec { color: var(--ink-mute); font-size: 11px; margin-left: 6px; }
+  .copy-btn {
+    margin-left: auto;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    border-radius: 7px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: transform .08s, background .12s;
+  }
+  .copy-btn:hover { background: #ffe04d; }
+  .copy-btn:active { transform: translateY(1px); }
+  .copy-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .copy-btn.copied { background: var(--ok); color: #0d2515; }
+
+  pre.zpl {
+    margin: 0;
+    padding: 16px 18px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: #d3d8e2;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  pre.zpl .cmd { color: #ff6a00; }
+  pre.zpl .num { color: #7dd3fc; }
+  pre.zpl .data { color: #a7e8b9; }
+  pre.zpl .cm { color: #b8946b; font-style: italic; }
+
+  .zpl-empty {
+    padding: 32px;
+    text-align: center;
+    color: var(--ink-mute);
+    font-size: 13px;
+  }
+
+  /* ── Footer help ────────────────────────────────────────── */
+  .help {
+    font-size: 12px;
+    color: var(--ink-mute);
+    line-height: 1.6;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .help b { color: var(--ink-dim); font-weight: 500; }
+  .kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    background: var(--panel-2);
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+  }
+
+  /* ── Tweaks ─────────────────────────────────────────────── */
+  details.tweaks {
+    margin-top: 6px;
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+  }
+  details.tweaks summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  details.tweaks summary::-webkit-details-marker { display: none; }
+  details.tweaks summary::before {
+    content: '+';
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--ink-dim);
+    display: grid; place-items: center;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  details.tweaks[open] summary::before { content: '−'; }
+  details.tweaks .tweak-body { margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="logo" style="background:transparent; text-decoration:none;" title="Hub"><img src="crunch logo.png" alt="Crunch Online" style="width:100%;height:100%;object-fit:contain;border-radius:8px;"></a>
+  <div>
+    <div class="title">Etiquetas de Caixa <span style="color:var(--ink-mute); font-weight: 400; font-size: 12px; margin-left: 6px;">· estoque interno</span></div>
+    <div class="subtitle"><a href="index.html" style="color:var(--ink-dim); text-decoration: none;">↩ hub</a> · ZPL para impressora térmica</div>
+  </div>
+  <div class="topbar-spec">
+    <span>Formato: <b>40 × 25 mm</b></span>
+    <span>Layout: <b>Dupla</b></span>
+    <span>Resolução: <b>203 DPI</b></span>
+  </div>
+  <a class="nav-link" href="Etiquetas Prontas.html" style="margin-left: 14px; color: var(--ink-dim); text-decoration: none; font-size: 12px; padding: 6px 10px; border: 1px solid var(--line-2); border-radius: 7px;">Etiquetas de Produto →</a>
+</div>
+
+<div class="wrap">
+  <!-- ── LEFT: form ────────────────────────────────────────── -->
+  <div class="col-left">
+    <div class="field">
+      <div class="label">
+        <span>Fornecedor</span>
+        <span class="hint" id="forn-count">—</span>
+      </div>
+      <select id="sel-fornecedor">
+        <option value="">— selecione —</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <span>Produto</span>
+        <span class="hint" id="prod-count">selecione um fornecedor</span>
+      </div>
+      <select id="sel-produto" disabled>
+        <option value="">—</option>
+      </select>
+    </div>
+
+    <div id="info-card" class="info-card" style="display:none;">
+      <div class="info-title">Dados da etiqueta</div>
+      <div class="info-row"><span class="k">Produto</span><span class="v" id="i-produto">—</span></div>
+      <div class="info-row"><span class="k">Código</span><span class="v code" id="i-codigo">—</span></div>
+      <div class="info-row"><span class="k">Fornecedor</span><span class="v" id="i-forn">—</span></div>
+      <div class="info-row"><span class="k">Variação</span><span class="v" id="i-var">—</span></div>
+    </div>
+
+    <details class="tweaks">
+      <summary>Ajustes finos</summary>
+      <div class="tweak-body">
+        <div class="row">
+          <div class="field" style="margin-bottom:12px;">
+            <div class="label"><span>Cópias (pares)</span></div>
+            <input type="number" id="tw-copies" min="1" max="999" value="1" />
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <div class="label"><span>Espelhar par</span></div>
+            <select id="tw-mirror">
+              <option value="duplo">Mesma etiqueta nos 2</option>
+              <option value="simples">Só 1 lado</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <div class="label"><span>Tamanho do produto</span><span class="hint">auto se vazio</span></div>
+          <select id="tw-fsize">
+            <option value="auto">Automático</option>
+            <option value="50">Enorme (50)</option>
+            <option value="44">Muito grande (44)</option>
+            <option value="38">Grande (38)</option>
+            <option value="32">Médio (32)</option>
+            <option value="26">Pequeno (26)</option>
+            <option value="22">Muito pequeno (22)</option>
+          </select>
+        </div>
+      </div>
+    </details>
+
+    <div class="help" style="margin-top: 22px;">
+      <b>Como usar:</b><br>
+      1. Escolha fornecedor e produto<br>
+      2. Confira o preview à direita<br>
+      3. Clique em <b>Copiar ZPL</b> e cole no software de impressão<br><br>
+      <b>Observação:</b> Largura total impressa <span class="kbd">PW664</span> (320 dots × 2 etiquetas + gap). Suporta acentos via <span class="kbd">^CI28</span>.
+    </div>
+  </div>
+
+  <!-- ── RIGHT: preview + ZPL ─────────────────────────────── -->
+  <div class="col-right">
+    <section>
+      <div class="section-h">
+        <h2>Pré-visualização</h2>
+        <span class="meta">Tamanho real ampliado em 5×</span>
+      </div>
+      <div class="preview-stage">
+        <div class="etiqueta-pair" id="preview">
+          <div class="etiqueta"><span class="etiqueta-empty">Selecione um produto</span></div>
+          <div class="etiqueta"><span class="etiqueta-empty">Selecione um produto</span></div>
+        </div>
+      </div>
+      <div class="scale-bar">
+        <span><b>40 mm</b> × etiqueta</span>
+        <span><b>25 mm</b> altura</span>
+        <span>2 etiquetas por avanço</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-h">
+        <h2>Código ZPL</h2>
+        <span class="meta">Pronto para colar no software de impressão</span>
+      </div>
+      <div class="zpl-card">
+        <div class="zpl-head">
+          <span class="dot idle" id="zpl-dot"></span>
+          <span class="name" id="zpl-name">aguardando produto…</span>
+          <span class="spec" id="zpl-spec"></span>
+          <button class="copy-btn" id="copy-btn" disabled>Copiar ZPL</button>
+        </div>
+        <div id="zpl-out">
+          <div class="zpl-empty">O código ZPL aparece aqui após escolher o produto.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
