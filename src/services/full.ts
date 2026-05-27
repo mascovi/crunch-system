@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { buscarSaldoCodigo } from './estoque'
-import type { EnvioFull, EnvioFullItem, CSVFullItem } from '@/types'
+import type { EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader } from '@/types'
 
 /**
  * Valida os itens do CSV FULL contra o estoque disponível.
@@ -18,9 +18,9 @@ export async function validarCSVFull(itens: CSVFullItem[]): Promise<string[]> {
     const saldo = await buscarSaldoCodigo(item.codigo_ml)
 
     if (saldo <= 0) {
-      erros.push(`${item.codigo_ml}: sem saldo em estoque (saldo: ${saldo}).`)
+      erros.push(`${item.codigo_ml} (${item.descricao || '?'}): sem saldo em estoque (saldo: ${saldo}).`)
     } else if (item.quantidade > saldo) {
-      erros.push(`${item.codigo_ml}: quantidade (${item.quantidade}) excede saldo (${saldo}).`)
+      erros.push(`${item.codigo_ml} (${item.descricao || '?'}): quantidade (${item.quantidade}) excede saldo (${saldo}).`)
     }
   }
 
@@ -29,13 +29,25 @@ export async function validarCSVFull(itens: CSVFullItem[]): Promise<string[]> {
 
 /**
  * Processa envio FULL:
- * 1. Cria registro de envio
- * 2. Cria itens do envio
+ * 1. Cria registro de envio com dados do cabeçalho CSV
+ * 2. Cria itens do envio com descrição e fornecedor
  * 3. Gera movimentações de SAÍDA no estoque
  */
-export async function processarEnvioFull(itens: CSVFullItem[]): Promise<EnvioFull> {
+export async function processarEnvioFull(
+  itens: CSVFullItem[],
+  header?: CSVFullHeader
+): Promise<EnvioFull> {
   const totalItens = itens.reduce((sum, i) => sum + i.quantidade, 0)
   const totalCodigos = itens.length
+
+  // Converter data do CSV (DD/MM/YYYY) para ISO
+  let dataEnvioCSV: string | null = null
+  if (header?.data_envio) {
+    const partes = header.data_envio.split('/')
+    if (partes.length === 3) {
+      dataEnvioCSV = `${partes[2]}-${partes[1]}-${partes[0]}`
+    }
+  }
 
   // Criar envio
   const { data: envio, error: envioError } = await supabase
@@ -44,17 +56,23 @@ export async function processarEnvioFull(itens: CSVFullItem[]): Promise<EnvioFul
       data_envio: new Date().toISOString(),
       total_itens: totalItens,
       total_codigos: totalCodigos,
+      codigo_envio_ml: header?.codigo_envio_ml || null,
+      numero_nf: header?.numero_nf || null,
+      data_envio_csv: dataEnvioCSV,
     })
     .select()
     .single()
 
   if (envioError) throw new Error(`Erro ao criar envio: ${envioError.message}`)
 
-  // Criar itens do envio
+  // Criar itens do envio (com descrição e fornecedor)
   const itensEnvio = itens.map((item) => ({
     envio_id: envio.id,
     codigo_ml: item.codigo_ml,
     quantidade: item.quantidade,
+    descricao: item.descricao || null,
+    fornecedor: item.fornecedor || null,
+    variacao: item.variacao || null,
   }))
 
   const { error: itensError } = await supabase
@@ -64,27 +82,15 @@ export async function processarEnvioFull(itens: CSVFullItem[]): Promise<EnvioFul
   if (itensError) throw new Error(`Envio criado mas erro nos itens: ${itensError.message}`)
 
   // Gerar movimentações de saída
-  // Precisamos buscar o nome do produto para cada código
-  const movimentacoes = []
-  for (const item of itens) {
-    // Buscar nome do produto pela última movimentação
-    const { data: ultimaMov } = await supabase
-      .from('estoque_movimentacoes')
-      .select('produto')
-      .eq('codigo_ml', item.codigo_ml)
-      .limit(1)
-      .single()
-
-    movimentacoes.push({
-      codigo_ml: item.codigo_ml,
-      produto: ultimaMov?.produto || item.codigo_ml,
-      tipo: 'SAIDA',
-      quantidade: item.quantidade,
-      origem: 'ENVIO_FULL',
-      referencia_id: envio.id,
-      data: new Date().toISOString(),
-    })
-  }
+  const movimentacoes = itens.map((item) => ({
+    codigo_ml: item.codigo_ml,
+    produto: item.descricao || item.codigo_ml,
+    tipo: 'SAIDA',
+    quantidade: item.quantidade,
+    origem: 'ENVIO_FULL',
+    referencia_id: envio.id,
+    data: new Date().toISOString(),
+  }))
 
   const { error: movError } = await supabase
     .from('estoque_movimentacoes')

@@ -50,6 +50,9 @@ export interface EnvioFull {
   arquivo_csv?: string
   total_itens: number
   total_codigos: number
+  codigo_envio_ml?: string
+  numero_nf?: string
+  data_envio_csv?: string
 }
 
 export interface EnvioFullItem {
@@ -57,6 +60,9 @@ export interface EnvioFullItem {
   envio_id: string
   codigo_ml: string
   quantidade: number
+  descricao?: string
+  fornecedor?: string
+  variacao?: string
 }
 
 // ============================================
@@ -87,6 +93,15 @@ export interface XMLParsedItem {
 export interface CSVFullItem {
   codigo_ml: string
   quantidade: number
+  descricao?: string
+  fornecedor?: string
+  variacao?: string
+}
+
+export interface CSVFullHeader {
+  data_envio: string       // "27/05/2026"
+  numero_nf: string        // "218.354"
+  codigo_envio_ml: string  // "65623092"
 }
 
 // ============================================

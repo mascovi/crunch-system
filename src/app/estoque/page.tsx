@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Papa from 'papaparse'
 import { listarEstoque } from '@/services/estoque'
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
-import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem } from '@/types'
+import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader } from '@/types'
 import ConfirmModal from '@/components/ConfirmModal'
 
 type Tab = 'estoque' | 'enviar-full' | 'historico'
@@ -160,6 +160,7 @@ function TabEstoque() {
 // ============================================
 function TabEnviarFull() {
   const [csvItens, setCsvItens] = useState<CSVFullItem[]>([])
+  const [csvHeader, setCsvHeader] = useState<CSVFullHeader | null>(null)
   const [errors, setErrors] = useState<string[]>([])
   const [fileName, setFileName] = useState('')
   const [step, setStep] = useState<'upload' | 'preview' | 'success'>('upload')
@@ -179,44 +180,30 @@ function TabEnviarFull() {
     setFileName(file.name)
     setErrors([])
 
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const itens: CSVFullItem[] = []
-        const parseErrors: string[] = []
+    // Ler como texto bruto para parsing customizado
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      if (!text) {
+        setErrors(['Erro ao ler arquivo.'])
+        return
+      }
 
-        results.data.forEach((row, i) => {
-          // Procurar coluna de código ML (flexível)
-          const codigoML = row['codigo_ml'] || row['Codigo ML'] || row['CODIGO_ML'] || row['CodigoML'] || row['MLB'] || ''
-          const qtd = parseInt(row['quantidade'] || row['Quantidade'] || row['QUANTIDADE'] || row['qtd'] || row['QTD'] || '0', 10)
-
-          if (!codigoML) {
-            parseErrors.push(`Linha ${i + 2}: Código ML não encontrado.`)
-            return
-          }
-
-          if (isNaN(qtd) || qtd <= 0) {
-            parseErrors.push(`Linha ${i + 2}: Quantidade inválida para ${codigoML}.`)
-            return
-          }
-
-          itens.push({ codigo_ml: codigoML.toUpperCase(), quantidade: qtd })
-        })
-
-        if (parseErrors.length > 0) {
-          setErrors(parseErrors)
+      try {
+        const result = parseCSVFull(text)
+        if (result.errors.length > 0) {
+          setErrors(result.errors)
         }
-
-        if (itens.length > 0) {
-          setCsvItens(itens)
+        if (result.itens.length > 0) {
+          setCsvItens(result.itens)
+          setCsvHeader(result.header)
           setStep('preview')
         }
-      },
-      error: () => {
+      } catch {
         setErrors(['Erro ao processar CSV. Verifique o formato do arquivo.'])
-      },
-    })
+      }
+    }
+    reader.readAsText(file, 'utf-8')
   }
 
   const handleEnviar = async () => {
@@ -233,8 +220,8 @@ function TabEnviarFull() {
         return
       }
 
-      // Processar envio
-      await processarEnvioFull(csvItens)
+      // Processar envio com dados do cabeçalho
+      await processarEnvioFull(csvItens, csvHeader || undefined)
       setConfirmOpen(false)
       setStep('success')
     } catch (err) {
@@ -248,6 +235,7 @@ function TabEnviarFull() {
   const handleReset = () => {
     setStep('upload')
     setCsvItens([])
+    setCsvHeader(null)
     setErrors([])
     setFileName('')
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -280,17 +268,35 @@ function TabEnviarFull() {
           <div className="text-4xl mb-4 text-crunch-accent">&uarr;</div>
           <h2 className="text-lg font-semibold mb-2">Enviar CSV FULL</h2>
           <p className="text-sm text-crunch-ink-mute mb-4">
-            O CSV deve conter as colunas: <code className="font-mono text-crunch-accent">codigo_ml</code> e <code className="font-mono text-crunch-accent">quantidade</code>
+            Use a planilha padrão de controle de envio (CONTROLE ENVIO CODIGO).
           </p>
         </div>
       )}
 
       {step === 'preview' && (
         <div className="space-y-6">
+          {/* Dados do cabeçalho */}
+          {csvHeader && (
+            <div className="bg-crunch-panel border border-crunch-line rounded-xl px-6 py-4 flex flex-wrap gap-6">
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-crunch-ink-mute block">Data do Envio</span>
+                <span className="text-sm font-semibold">{csvHeader.data_envio}</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-crunch-ink-mute block">NF</span>
+                <span className="text-sm font-semibold">{csvHeader.numero_nf || '—'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-crunch-ink-mute block">Envio ML N&deg;</span>
+                <span className="text-sm font-mono font-semibold text-crunch-accent">{csvHeader.codigo_envio_ml}</span>
+              </div>
+            </div>
+          )}
+
           <div className="bg-crunch-panel border border-crunch-line rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-crunch-line flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-crunch-ink-dim">
-                Pré-visualização — {fileName}
+                Itens do envio — {fileName}
               </h3>
               <span className="text-xs font-mono text-crunch-accent">
                 {csvItens.length} códigos &middot; {totalItens} unidades
@@ -300,19 +306,25 @@ function TabEnviarFull() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-crunch-panel">
                   <tr className="text-[10px] uppercase tracking-wider text-crunch-ink-mute border-b border-crunch-line">
-                    <th className="text-left px-6 py-3 font-semibold">Código ML</th>
-                    <th className="text-center px-6 py-3 font-semibold">Quantidade</th>
+                    <th className="text-left px-6 py-3 font-semibold">Produto</th>
+                    <th className="text-left px-4 py-3 font-semibold">Fornecedor</th>
+                    <th className="text-left px-4 py-3 font-semibold">Código ML</th>
+                    <th className="text-center px-4 py-3 font-semibold">Qtd</th>
                   </tr>
                 </thead>
                 <tbody>
                   {csvItens.map((item, i) => (
                     <tr key={i} className="border-b border-crunch-line/50">
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 text-crunch-ink-dim text-xs max-w-[220px] truncate">
+                        {item.descricao || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-crunch-ink-mute">{item.fornecedor || '—'}</td>
+                      <td className="px-4 py-3">
                         <span className="font-mono text-xs bg-crunch-accent/10 text-crunch-accent border border-crunch-accent/30 px-2 py-0.5 rounded">
                           {item.codigo_ml}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-center font-medium">{item.quantidade}</td>
+                      <td className="px-4 py-3 text-center font-medium">{item.quantidade}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -341,9 +353,14 @@ function TabEnviarFull() {
         <div className="bg-crunch-panel border border-crunch-line rounded-2xl p-12 text-center">
           <div className="text-4xl mb-4 text-green-400">&#10003;</div>
           <h2 className="text-xl font-semibold mb-2">Envio FULL processado</h2>
-          <p className="text-sm text-crunch-ink-dim mb-8">
+          <p className="text-sm text-crunch-ink-dim mb-2">
             {csvItens.length} códigos enviados, {totalItens} unidades subtraídas do estoque.
           </p>
+          {csvHeader && (
+            <p className="text-xs text-crunch-ink-mute mb-8">
+              Envio ML: <b className="text-crunch-accent">{csvHeader.codigo_envio_ml}</b> &middot; Data: {csvHeader.data_envio}
+            </p>
+          )}
           <button
             onClick={handleReset}
             className="px-6 py-3 text-sm font-medium rounded-xl border border-crunch-line text-crunch-ink-dim hover:bg-crunch-panel-2 transition-colors"
@@ -365,6 +382,116 @@ function TabEnviarFull() {
       />
     </div>
   )
+}
+
+/**
+ * Parser customizado para o CSV de envio FULL da Crunch.
+ * Lê cabeçalho (DATA, NF, ENVIO ML N°) e itens (FORNECEDOR, ML, QTD).
+ * Agrupa produtos duplicados somando quantidades.
+ */
+function parseCSVFull(text: string): { header: CSVFullHeader; itens: CSVFullItem[]; errors: string[] } {
+  const lines = text.split('\n').map(l => l.replace(/\r$/, ''))
+  const errors: string[] = []
+
+  // 1) Extrair cabeçalho — procurar linha que contém DATA, NF e ENVIO ML
+  let header: CSVFullHeader = { data_envio: '', numero_nf: '', codigo_envio_ml: '' }
+
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    const cells = lines[i].split(',')
+    if (cells.some(c => c.trim().toUpperCase().includes('DATA')) &&
+        cells.some(c => c.trim().toUpperCase().includes('ENVIO'))) {
+      if (i + 1 < lines.length) {
+        const vals = lines[i + 1].split(',')
+        const dataIdx = cells.findIndex(c => c.trim().toUpperCase() === 'DATA')
+        const nfIdx = cells.findIndex(c => c.trim().toUpperCase() === 'NF')
+        const envioIdx = cells.findIndex(c => c.trim().toUpperCase().includes('ENVIO'))
+
+        if (dataIdx >= 0) header.data_envio = vals[dataIdx]?.trim() || ''
+        if (nfIdx >= 0) header.numero_nf = vals[nfIdx]?.trim() || ''
+        if (envioIdx >= 0) header.codigo_envio_ml = vals[envioIdx]?.trim() || ''
+      }
+      break
+    }
+  }
+
+  // 2) Encontrar linha de cabeçalho dos itens — contém "ML" e "QTD"
+  let itemHeaderIdx = -1
+  const colMap = { item: -1, fornecedor: -1, ml: -1, variacao: -1, qtd: -1 }
+
+  for (let i = 0; i < lines.length; i++) {
+    const cells = lines[i].split(',').map(c => c.trim().toUpperCase())
+    const mlIdx = cells.findIndex(c => c === 'ML')
+    const qtdIdx = cells.findIndex(c => c === 'QTD')
+
+    if (mlIdx >= 0 && qtdIdx >= 0) {
+      itemHeaderIdx = i
+      colMap.item = cells.findIndex(c => c === 'ITEM')
+      colMap.fornecedor = cells.findIndex(c => c === 'FORNECEDOR')
+      colMap.ml = mlIdx
+      colMap.variacao = cells.findIndex(c => c === 'VARIAÇÃO' || c === 'VARIACAO')
+      colMap.qtd = qtdIdx
+      break
+    }
+  }
+
+  if (itemHeaderIdx === -1) {
+    errors.push('Formato inválido: não encontrou colunas ML e QTD no CSV.')
+    return { header, itens: [], errors }
+  }
+
+  // 3) Ler itens — linhas após o cabeçalho dos itens
+  const rawItens: CSVFullItem[] = []
+
+  for (let i = itemHeaderIdx + 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line.trim()) continue
+
+    // Usar PapaParse para lidar com aspas em campos
+    const parsed = Papa.parse(line, { header: false })
+    const cells = (parsed.data[0] as string[]) || []
+    if (!cells || cells.length <= colMap.ml) continue
+
+    const codigoML = cells[colMap.ml]?.trim().toUpperCase() || ''
+    const qtdStr = cells[colMap.qtd]?.trim() || ''
+    const qtd = parseInt(qtdStr, 10)
+
+    // Pular linhas sem código ML ou com texto de resumo
+    if (!codigoML || codigoML.length < 4) continue
+    if (isNaN(qtd) || qtd <= 0) continue
+
+    const descricao = colMap.item >= 0 && cells.length > 1
+      ? cells[1]?.trim() || ''
+      : ''
+    const fornecedor = colMap.fornecedor >= 0 ? cells[colMap.fornecedor]?.trim() || '' : ''
+    const variacao = colMap.variacao >= 0 ? cells[colMap.variacao]?.trim() || '' : ''
+
+    rawItens.push({
+      codigo_ml: codigoML,
+      quantidade: qtd,
+      descricao,
+      fornecedor,
+      variacao,
+    })
+  }
+
+  // 4) Agrupar duplicados (mesmo codigo_ml) somando quantidades
+  const agrupado = new Map<string, CSVFullItem>()
+  for (const item of rawItens) {
+    const existing = agrupado.get(item.codigo_ml)
+    if (existing) {
+      existing.quantidade += item.quantidade
+    } else {
+      agrupado.set(item.codigo_ml, { ...item })
+    }
+  }
+
+  const itens = Array.from(agrupado.values())
+
+  if (itens.length === 0) {
+    errors.push('Nenhum item válido encontrado no CSV.')
+  }
+
+  return { header, itens, errors }
 }
 
 // ============================================
@@ -420,8 +547,22 @@ function TabHistorico() {
               className="bg-crunch-panel border border-crunch-line rounded-xl p-5"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-semibold">{formatDate(envio.data_envio)}</span>
+                <div className="flex items-center gap-4 flex-wrap">
+                  {envio.codigo_envio_ml && (
+                    <span className="text-xs font-semibold bg-crunch-accent/10 text-crunch-accent border border-crunch-accent/30 px-2.5 py-1 rounded-lg">
+                      Envio #{envio.codigo_envio_ml}
+                    </span>
+                  )}
+                  <span className="text-sm font-semibold">
+                    {envio.data_envio_csv
+                      ? new Date(envio.data_envio_csv + 'T12:00:00').toLocaleDateString('pt-BR')
+                      : formatDate(envio.data_envio)}
+                  </span>
+                  {envio.numero_nf && (
+                    <span className="text-xs text-crunch-ink-mute">
+                      NF {envio.numero_nf}
+                    </span>
+                  )}
                   <span className="text-xs font-mono bg-crunch-panel-2 border border-crunch-line-2 px-2 py-0.5 rounded text-crunch-ink-dim">
                     {envio.total_codigos} códigos
                   </span>
@@ -443,13 +584,29 @@ function TabHistorico() {
                   {viewLoading ? (
                     <p className="text-xs text-crunch-ink-mute">Carregando itens...</p>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {viewItens.map((item) => (
-                        <div key={item.id} className="bg-crunch-panel-2 border border-crunch-line-2 rounded-lg px-3 py-2 text-xs">
-                          <span className="font-mono text-crunch-accent">{item.codigo_ml}</span>
-                          <span className="text-crunch-ink-mute ml-2">&times;{item.quantidade}</span>
-                        </div>
-                      ))}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-[10px] uppercase tracking-wider text-crunch-ink-mute border-b border-crunch-line/50">
+                            <th className="text-left px-3 py-2 font-semibold">Produto</th>
+                            <th className="text-left px-3 py-2 font-semibold">Fornecedor</th>
+                            <th className="text-left px-3 py-2 font-semibold">Código ML</th>
+                            <th className="text-center px-3 py-2 font-semibold">Qtd</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewItens.map((item) => (
+                            <tr key={item.id} className="border-b border-crunch-line/30">
+                              <td className="px-3 py-2 text-crunch-ink-dim max-w-[200px] truncate">{item.descricao || '—'}</td>
+                              <td className="px-3 py-2 text-crunch-ink-mute">{item.fornecedor || '—'}</td>
+                              <td className="px-3 py-2">
+                                <span className="font-mono text-crunch-accent">{item.codigo_ml}</span>
+                              </td>
+                              <td className="px-3 py-2 text-center font-medium">{item.quantidade}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>
