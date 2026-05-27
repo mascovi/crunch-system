@@ -66,6 +66,7 @@ export async function salvarNotaFiscal(
       data_upload: new Date().toISOString(),
       status: 'EM_TRANSITO',
       volumes: parsedNF.volumes,
+      transportadora: parsedNF.transportadora,
       xml_url: xmlUrl,
     })
     .select()

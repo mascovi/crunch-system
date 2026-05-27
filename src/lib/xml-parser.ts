@@ -3,7 +3,7 @@ import type { XMLParsedNF, XMLParsedItem } from '@/types'
 
 /**
  * Parser de XML de Nota Fiscal Eletrônica (NF-e).
- * Extrai fornecedor, CNPJ, número, data, volumes e itens com Código ML.
+ * Extrai fornecedor, CNPJ, número, data, volumes, transportadora e itens com Código ML.
  */
 export function parseNFeXML(xmlString: string): XMLParsedNF {
   const parser = new XMLParser({
@@ -48,10 +48,17 @@ export function parseNFeXML(xmlString: string): XMLParsedNF {
   const numero_nf = String(ide.nNF || '')
   const data_emissao = (ide.dhEmi as string)?.substring(0, 10) || ''
 
-  // Volumes
+  // Transporte — transportadora e volumes
   const transp = infNFe.transp as Record<string, unknown>
   let volumes = 0
+  let transportadora = ''
   if (transp) {
+    // Transportadora
+    const transporta = transp.transporta as Record<string, unknown>
+    if (transporta) {
+      transportadora = (transporta.xNome as string) || ''
+    }
+    // Volumes
     const vol = transp.vol as Record<string, unknown> | Record<string, unknown>[]
     if (Array.isArray(vol)) {
       volumes = vol.reduce((sum, v) => sum + (Number(v.qVol) || 0), 0)
@@ -90,6 +97,7 @@ export function parseNFeXML(xmlString: string): XMLParsedNF {
     numero_nf,
     data_emissao,
     volumes,
+    transportadora,
     itens,
   }
 }

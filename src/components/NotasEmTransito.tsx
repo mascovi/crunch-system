@@ -126,6 +126,7 @@ export default function NotasEmTransito() {
                 <tr className="text-[10px] uppercase tracking-wider text-crunch-ink-mute border-b border-crunch-line">
                   <th className="text-left px-6 py-3 font-semibold">Fornecedor</th>
                   <th className="text-left px-4 py-3 font-semibold">NF</th>
+                  <th className="text-left px-4 py-3 font-semibold">Transportadora</th>
                   <th className="text-center px-4 py-3 font-semibold">Volumes</th>
                   <th className="text-left px-4 py-3 font-semibold">Faturamento</th>
                   <th className="text-center px-4 py-3 font-semibold">Dias Úteis</th>
@@ -140,6 +141,7 @@ export default function NotasEmTransito() {
                   >
                     <td className="px-6 py-4 font-medium">{nota.fornecedor}</td>
                     <td className="px-4 py-4 font-mono text-crunch-ink-dim">{nota.numero_nf}</td>
+                    <td className="px-4 py-4 text-crunch-ink-dim text-xs">{nota.transportadora || '—'}</td>
                     <td className="px-4 py-4 text-center text-crunch-ink-dim">{nota.volumes}</td>
                     <td className="px-4 py-4 text-crunch-ink-dim">{formatDate(nota.data_emissao)}</td>
                     <td className={`px-4 py-4 text-center font-semibold ${getDiasUteisColor(nota.dias_uteis)}`}>

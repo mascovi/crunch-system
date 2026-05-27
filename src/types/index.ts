@@ -13,6 +13,7 @@ export interface NotaFiscal {
   status: 'EM_TRANSITO' | 'ENTREGUE'
   volumes: number
   xml_url?: string
+  transportadora?: string
 }
 
 export interface ItemNF {
@@ -77,6 +78,7 @@ export interface XMLParsedNF {
   numero_nf: string
   data_emissao: string
   volumes: number
+  transportadora: string
   itens: XMLParsedItem[]
 }
 
