@@ -3,7 +3,8 @@ import type { SaldoEstoque, EstoqueMovimentacao } from '@/types'
 
 /**
  * Busca o saldo atual de estoque calculado por movimentações.
- * Agrupa por codigo_ml, soma entradas e subtrai saídas.
+ * Cruza com tabela produtos para pegar fornecedor real.
+ * Calcula preço médio de compra ponderado pelas entradas.
  */
 export async function listarEstoque(): Promise<SaldoEstoque[]> {
   // Buscar todas as movimentações
@@ -14,6 +15,16 @@ export async function listarEstoque(): Promise<SaldoEstoque[]> {
 
   if (error) throw new Error(`Erro ao buscar movimentações: ${error.message}`)
 
+  // Buscar catálogo de produtos para fornecedor
+  const { data: produtos } = await supabase
+    .from('produtos')
+    .select('codigo_ml, fornecedor, descricao')
+
+  const produtoMap = new Map<string, { fornecedor: string; descricao: string }>()
+  for (const p of produtos || []) {
+    produtoMap.set(p.codigo_ml, { fornecedor: p.fornecedor, descricao: p.descricao })
+  }
+
   // Agrupar por codigo_ml
   const mapa = new Map<string, {
     produto: string
@@ -21,22 +32,28 @@ export async function listarEstoque(): Promise<SaldoEstoque[]> {
     saidas: number
     ultima_mov: string
     fornecedor: string
+    preco_total: number
+    qtd_com_preco: number
   }>()
 
-  for (const mov of (movimentacoes || []) as EstoqueMovimentacao[]) {
+  for (const mov of (movimentacoes || []) as (EstoqueMovimentacao & { preco_compra?: number })[]) {
     const atual = mapa.get(mov.codigo_ml) || {
       produto: mov.produto,
       entradas: 0,
       saidas: 0,
       ultima_mov: mov.data,
       fornecedor: '',
+      preco_total: 0,
+      qtd_com_preco: 0,
     }
 
     if (mov.tipo === 'ENTRADA') {
       atual.entradas += mov.quantidade
-      // O fornecedor mais recente é o principal
-      if (!atual.fornecedor || mov.data > atual.ultima_mov) {
-        atual.fornecedor = mov.origem
+      // Acumular preço ponderado (só entradas com preço > 0)
+      const preco = mov.preco_compra || 0
+      if (preco > 0) {
+        atual.preco_total += preco * mov.quantidade
+        atual.qtd_com_preco += mov.quantidade
       }
     } else {
       atual.saidas += mov.quantidade
@@ -53,12 +70,22 @@ export async function listarEstoque(): Promise<SaldoEstoque[]> {
   // Converter para array de SaldoEstoque
   const resultado: SaldoEstoque[] = []
   mapa.forEach((val, codigo_ml) => {
+    // Fornecedor vem da tabela produtos (fonte confiável)
+    const prod = produtoMap.get(codigo_ml)
+    const fornecedor = prod?.fornecedor || ''
+
+    // Preço médio ponderado
+    const precoMedio = val.qtd_com_preco > 0
+      ? val.preco_total / val.qtd_com_preco
+      : 0
+
     resultado.push({
       codigo_ml,
-      produto: val.produto,
+      produto: prod?.descricao || val.produto,
       quantidade_disponivel: val.entradas - val.saidas,
       ultima_movimentacao: val.ultima_mov,
-      fornecedor_principal: val.fornecedor,
+      fornecedor_principal: fornecedor,
+      preco_compra: precoMedio,
     })
   })
 

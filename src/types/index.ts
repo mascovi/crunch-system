@@ -31,9 +31,10 @@ export interface EstoqueMovimentacao {
   produto: string
   tipo: 'ENTRADA' | 'SAIDA'
   quantidade: number
-  origem: string // 'NF_RECEBIMENTO' | 'ENVIO_FULL'
+  origem: string // 'NF_RECEBIMENTO' | 'ENVIO_FULL' | 'AJUSTE_INICIAL'
   referencia_id: string
   data: string
+  preco_compra?: number
 }
 
 export interface SaldoEstoque {
@@ -42,6 +43,7 @@ export interface SaldoEstoque {
   quantidade_disponivel: number
   ultima_movimentacao: string
   fornecedor_principal: string
+  preco_compra: number
 }
 
 export interface EnvioFull {

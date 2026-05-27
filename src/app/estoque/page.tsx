@@ -64,6 +64,7 @@ function TabEstoque() {
   const [estoque, setEstoque] = useState<SaldoEstoque[]>([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
+  const [filtroFornecedor, setFiltroFornecedor] = useState('')
 
   useEffect(() => {
     listarEstoque()
@@ -72,16 +73,28 @@ function TabEstoque() {
       .finally(() => setLoading(false))
   }, [])
 
-  const filtrado = estoque.filter(
-    (item) =>
+  // Extrair fornecedores únicos para o dropdown
+  const fornecedores = Array.from(
+    new Set(estoque.map((item) => item.fornecedor_principal).filter(Boolean))
+  ).sort()
+
+  const filtrado = estoque.filter((item) => {
+    const matchBusca =
       item.codigo_ml.toLowerCase().includes(busca.toLowerCase()) ||
       item.produto.toLowerCase().includes(busca.toLowerCase())
-  )
+    const matchFornecedor = !filtroFornecedor || item.fornecedor_principal === filtroFornecedor
+    return matchBusca && matchFornecedor
+  })
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '—'
     const d = new Date(dateStr)
     return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const formatPreco = (valor: number) => {
+    if (!valor || valor === 0) return '—'
+    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   }
 
   if (loading) {
@@ -90,15 +103,25 @@ function TabEstoque() {
 
   return (
     <div className="space-y-4 animate-fade-in-up">
-      {/* Busca */}
-      <div className="flex gap-4 items-center">
+      {/* Busca + Filtro Fornecedor */}
+      <div className="flex gap-4 items-center flex-wrap">
         <input
           type="text"
           placeholder="Buscar por Código ML ou produto..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          className="flex-1 bg-crunch-panel border border-crunch-line rounded-xl px-4 py-3 text-sm text-crunch-ink placeholder:text-crunch-ink-mute focus:outline-none focus:border-crunch-accent transition-colors"
+          className="flex-1 min-w-[200px] bg-crunch-panel border border-crunch-line rounded-xl px-4 py-3 text-sm text-crunch-ink placeholder:text-crunch-ink-mute focus:outline-none focus:border-crunch-accent transition-colors"
         />
+        <select
+          value={filtroFornecedor}
+          onChange={(e) => setFiltroFornecedor(e.target.value)}
+          className="bg-crunch-panel border border-crunch-line rounded-xl px-4 py-3 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent transition-colors appearance-none cursor-pointer"
+        >
+          <option value="">Todos os fornecedores</option>
+          {fornecedores.map((f) => (
+            <option key={f} value={f}>{f}</option>
+          ))}
+        </select>
         <span className="text-xs text-crunch-ink-mute font-mono">
           {filtrado.length} itens
         </span>
@@ -117,9 +140,10 @@ function TabEstoque() {
                 <tr className="text-[10px] uppercase tracking-wider text-crunch-ink-mute border-b border-crunch-line">
                   <th className="text-left px-6 py-3 font-semibold">Código ML</th>
                   <th className="text-left px-4 py-3 font-semibold">Produto</th>
+                  <th className="text-left px-4 py-3 font-semibold">Fornecedor</th>
                   <th className="text-center px-4 py-3 font-semibold">Disponível</th>
-                  <th className="text-left px-4 py-3 font-semibold">Última Mov.</th>
-                  <th className="text-left px-6 py-3 font-semibold">Fornecedor</th>
+                  <th className="text-right px-4 py-3 font-semibold">Preço Compra</th>
+                  <th className="text-left px-6 py-3 font-semibold">Última Mov.</th>
                 </tr>
               </thead>
               <tbody>
@@ -130,7 +154,12 @@ function TabEstoque() {
                         {item.codigo_ml}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-crunch-ink-dim max-w-[300px] truncate">{item.produto}</td>
+                    <td className="px-4 py-3 text-crunch-ink-dim max-w-[250px] truncate">{item.produto}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs bg-crunch-panel-2 border border-crunch-line-2 px-2 py-0.5 rounded text-crunch-ink-dim">
+                        {item.fornecedor_principal || '—'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`font-semibold ${
                         item.quantidade_disponivel <= 0
@@ -142,8 +171,10 @@ function TabEstoque() {
                         {item.quantidade_disponivel}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-crunch-ink-mute">{formatDate(item.ultima_movimentacao)}</td>
-                    <td className="px-6 py-3 text-crunch-ink-dim text-xs">{item.fornecedor_principal}</td>
+                    <td className="px-4 py-3 text-right text-xs text-crunch-ink-dim font-mono">
+                      {formatPreco(item.preco_compra)}
+                    </td>
+                    <td className="px-6 py-3 text-xs text-crunch-ink-mute">{formatDate(item.ultima_movimentacao)}</td>
                   </tr>
                 ))}
               </tbody>
