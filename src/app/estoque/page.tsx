@@ -5,7 +5,13 @@ import Link from 'next/link'
 import Papa from 'papaparse'
 import { listarEstoque, ajustarEstoque, cadastrarProduto, buscarHistoricoCodigo } from '@/services/estoque'
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
+import { supabase } from '@/lib/supabase'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao } from '@/types'
+
+// Tipo enriquecido com dados de referência
+interface MovimentacaoEnriquecida extends EstoqueMovimentacao {
+  ref_label?: string // "NF 12345" ou "Envio ML-ABC123"
+}
 import ConfirmModal from '@/components/ConfirmModal'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -111,7 +117,7 @@ function TabEstoque() {
   // Modal Histórico
   const [historicoOpen, setHistoricoOpen] = useState(false)
   const [historicoItem, setHistoricoItem] = useState<SaldoEstoque | null>(null)
-  const [historicoData, setHistoricoData] = useState<EstoqueMovimentacao[]>([])
+  const [historicoData, setHistoricoData] = useState<MovimentacaoEnriquecida[]>([])
   const [historicoLoading, setHistoricoLoading] = useState(false)
 
   // Sort
@@ -329,7 +335,58 @@ function TabEstoque() {
     setHistoricoOpen(true)
     try {
       const data = await buscarHistoricoCodigo(item.codigo_ml)
-      setHistoricoData(data)
+
+      // Enriquecer com referências (NF número, Envio código)
+      const nfIds = data.filter(m => m.origem === 'NF_RECEBIMENTO').map(m => m.referencia_id)
+      const envioIds = data.filter(m => m.origem === 'ENVIO_FULL').map(m => m.referencia_id)
+
+      const nfMap = new Map<string, string>()
+      const envioMap = new Map<string, string>()
+
+      if (nfIds.length > 0) {
+        const { data: nfs } = await supabase
+          .from('notas_fiscais')
+          .select('id, numero_nf, fornecedor')
+          .in('id', nfIds)
+        for (const nf of nfs || []) {
+          nfMap.set(nf.id, `NF ${nf.numero_nf} — ${nf.fornecedor}`)
+        }
+      }
+
+      if (envioIds.length > 0) {
+        const { data: envios } = await supabase
+          .from('envios_full')
+          .select('id, codigo_envio_ml')
+          .in('id', envioIds)
+        for (const env of envios || []) {
+          envioMap.set(env.id, `Envio ${env.codigo_envio_ml}`)
+        }
+      }
+
+      const enriquecido: MovimentacaoEnriquecida[] = data.map(mov => {
+        let ref_label: string | undefined
+        if (mov.origem === 'NF_RECEBIMENTO') {
+          ref_label = nfMap.get(mov.referencia_id)
+        } else if (mov.origem === 'ENVIO_FULL') {
+          ref_label = envioMap.get(mov.referencia_id)
+        } else if (mov.origem.startsWith('AJUSTE_')) {
+          // Extrair motivo legível do nome da origem
+          const motivo = mov.origem.replace('AJUSTE_', '')
+          const motivos: Record<string, string> = {
+            'DEVOLUCAO': 'Devolução de mercadoria',
+            'CONSUMO_PROPRIO': 'Consumo próprio',
+            'PROBLEMA_ENTREGA': 'Problema na entrega',
+            'EXTRAVIO': 'Extravio de mercadoria',
+            'CORRECAO_INVENTARIO': 'Correção de inventário',
+            'OUTRO': 'Outro motivo',
+            'INICIAL': 'Carga inicial do sistema',
+          }
+          ref_label = motivos[motivo] || motivo
+        }
+        return { ...mov, ref_label }
+      })
+
+      setHistoricoData(enriquecido)
     } catch (err) {
       console.error(err)
     } finally {
@@ -828,9 +885,12 @@ function TabEstoque() {
                               {origemInfo.label}
                             </span>
                           </div>
-                          {(mov as EstoqueMovimentacao & { preco_compra?: number }).preco_compra && (mov as EstoqueMovimentacao & { preco_compra?: number }).preco_compra! > 0 && (
+                          {mov.ref_label && (
+                            <p className="text-xs text-gray-500 mt-0.5">{mov.ref_label}</p>
+                          )}
+                          {mov.preco_compra && mov.preco_compra > 0 && (
                             <p className="text-xs text-gray-400 mt-0.5">
-                              Preço compra: {((mov as EstoqueMovimentacao & { preco_compra?: number }).preco_compra!).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              Preço compra: {mov.preco_compra.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </p>
                           )}
                         </div>
