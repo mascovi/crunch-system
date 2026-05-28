@@ -68,6 +68,21 @@ export interface EnvioFullItem {
   variacao?: string
 }
 
+export interface Produto {
+  id?: string
+  codigo_ml: string
+  descricao: string
+  fornecedor: string
+}
+
+export type MotivoAjuste =
+  | 'DEVOLUCAO'
+  | 'CONSUMO_PROPRIO'
+  | 'PROBLEMA_ENTREGA'
+  | 'EXTRAVIO'
+  | 'CORRECAO_INVENTARIO'
+  | 'OUTRO'
+
 // ============================================
 // TIPOS DO PARSER XML
 // ============================================

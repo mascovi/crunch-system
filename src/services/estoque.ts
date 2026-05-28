@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { SaldoEstoque, EstoqueMovimentacao } from '@/types'
+import type { SaldoEstoque, EstoqueMovimentacao, Produto, MotivoAjuste } from '@/types'
 
 /**
  * Busca o saldo atual de estoque calculado por movimentações.
@@ -126,5 +126,75 @@ export async function buscarHistoricoCodigo(codigoMl: string): Promise<EstoqueMo
     .order('data', { ascending: false })
 
   if (error) throw new Error(`Erro ao buscar histórico: ${error.message}`)
+  return data || []
+}
+
+/**
+ * Ajuste manual de estoque (devolução, consumo, problema, etc).
+ * Cria uma movimentação de ENTRADA (positivo) ou SAIDA (negativo).
+ */
+export async function ajustarEstoque(params: {
+  codigo_ml: string
+  produto: string
+  quantidade: number // positivo = entrada, negativo = saída
+  motivo: MotivoAjuste
+  observacao?: string
+}): Promise<void> {
+  const tipo = params.quantidade > 0 ? 'ENTRADA' : 'SAIDA'
+  const qtdAbsoluta = Math.abs(params.quantidade)
+  const origemLabel = `AJUSTE_${params.motivo}`
+
+  const { error } = await supabase
+    .from('estoque_movimentacoes')
+    .insert({
+      codigo_ml: params.codigo_ml,
+      produto: params.produto,
+      tipo,
+      quantidade: qtdAbsoluta,
+      origem: origemLabel,
+      referencia_id: crypto.randomUUID(),
+      data: new Date().toISOString(),
+      preco_compra: 0,
+    })
+
+  if (error) throw new Error(`Erro ao ajustar estoque: ${error.message}`)
+}
+
+/**
+ * Cadastrar novo produto na tabela produtos.
+ */
+export async function cadastrarProduto(produto: Produto): Promise<void> {
+  // Verificar se já existe
+  const { data: existente } = await supabase
+    .from('produtos')
+    .select('codigo_ml')
+    .eq('codigo_ml', produto.codigo_ml)
+    .limit(1)
+
+  if (existente && existente.length > 0) {
+    throw new Error(`Produto ${produto.codigo_ml} já existe no cadastro.`)
+  }
+
+  const { error } = await supabase
+    .from('produtos')
+    .insert({
+      codigo_ml: produto.codigo_ml,
+      descricao: produto.descricao,
+      fornecedor: produto.fornecedor,
+    })
+
+  if (error) throw new Error(`Erro ao cadastrar produto: ${error.message}`)
+}
+
+/**
+ * Listar todos os produtos cadastrados.
+ */
+export async function listarProdutos(): Promise<Produto[]> {
+  const { data, error } = await supabase
+    .from('produtos')
+    .select('*')
+    .order('descricao', { ascending: true })
+
+  if (error) throw new Error(`Erro ao listar produtos: ${error.message}`)
   return data || []
 }

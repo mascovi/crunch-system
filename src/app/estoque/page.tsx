@@ -3,12 +3,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
-import { listarEstoque } from '@/services/estoque'
+import { listarEstoque, ajustarEstoque, cadastrarProduto } from '@/services/estoque'
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
-import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader } from '@/types'
+import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste } from '@/types'
 import ConfirmModal from '@/components/ConfirmModal'
 
 type Tab = 'estoque' | 'enviar-full' | 'historico'
+
+const MOTIVOS: { value: MotivoAjuste; label: string }[] = [
+  { value: 'DEVOLUCAO', label: 'Devolução' },
+  { value: 'CONSUMO_PROPRIO', label: 'Consumo próprio' },
+  { value: 'PROBLEMA_ENTREGA', label: 'Problema na entrega' },
+  { value: 'EXTRAVIO', label: 'Extravio' },
+  { value: 'CORRECAO_INVENTARIO', label: 'Correção de inventário' },
+  { value: 'OUTRO', label: 'Outro' },
+]
 
 export default function EstoquePage() {
   const [tab, setTab] = useState<Tab>('estoque')
@@ -66,14 +75,44 @@ function TabEstoque() {
   const [busca, setBusca] = useState('')
   const [filtroFornecedor, setFiltroFornecedor] = useState('')
 
-  useEffect(() => {
-    listarEstoque()
-      .then(setEstoque)
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false))
+  // Modal Ajuste
+  const [ajusteOpen, setAjusteOpen] = useState(false)
+  const [ajusteItem, setAjusteItem] = useState<SaldoEstoque | null>(null)
+  const [ajusteQtd, setAjusteQtd] = useState('')
+  const [ajusteTipo, setAjusteTipo] = useState<'entrada' | 'saida'>('saida')
+  const [ajusteMotivo, setAjusteMotivo] = useState<MotivoAjuste>('CORRECAO_INVENTARIO')
+  const [ajusteObs, setAjusteObs] = useState('')
+  const [ajusteLoading, setAjusteLoading] = useState(false)
+  const [ajusteError, setAjusteError] = useState('')
+  const [ajusteSuccess, setAjusteSuccess] = useState('')
+
+  // Modal Novo Produto
+  const [novoProdOpen, setNovoProdOpen] = useState(false)
+  const [novoCodigoMl, setNovoCodigoMl] = useState('')
+  const [novoDescricao, setNovoDescricao] = useState('')
+  const [novoFornecedor, setNovoFornecedor] = useState('')
+  const [novoQtdInicial, setNovoQtdInicial] = useState('')
+  const [novoProdLoading, setNovoProdLoading] = useState(false)
+  const [novoProdError, setNovoProdError] = useState('')
+  const [novoProdSuccess, setNovoProdSuccess] = useState('')
+
+  const carregarEstoque = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await listarEstoque()
+      setEstoque(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  // Extrair fornecedores únicos para o dropdown
+  useEffect(() => {
+    carregarEstoque()
+  }, [carregarEstoque])
+
+  // Extrair fornecedores para o dropdown
   const fornecedores = Array.from(
     new Set(estoque.map((item) => item.fornecedor_principal).filter(Boolean))
   ).sort()
@@ -97,13 +136,104 @@ function TabEstoque() {
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   }
 
+  // === Handlers Ajuste ===
+  const openAjuste = (item: SaldoEstoque) => {
+    setAjusteItem(item)
+    setAjusteQtd('')
+    setAjusteTipo('saida')
+    setAjusteMotivo('CORRECAO_INVENTARIO')
+    setAjusteObs('')
+    setAjusteError('')
+    setAjusteSuccess('')
+    setAjusteOpen(true)
+  }
+
+  const handleAjuste = async () => {
+    if (!ajusteItem) return
+    const qtd = parseInt(ajusteQtd, 10)
+    if (isNaN(qtd) || qtd <= 0) {
+      setAjusteError('Informe uma quantidade válida maior que zero.')
+      return
+    }
+    setAjusteLoading(true)
+    setAjusteError('')
+    try {
+      const quantidade = ajusteTipo === 'saida' ? -qtd : qtd
+      await ajustarEstoque({
+        codigo_ml: ajusteItem.codigo_ml,
+        produto: ajusteItem.produto,
+        quantidade,
+        motivo: ajusteMotivo,
+        observacao: ajusteObs,
+      })
+      setAjusteSuccess(`Estoque de ${ajusteItem.codigo_ml} ajustado com sucesso.`)
+      await carregarEstoque()
+      setTimeout(() => {
+        setAjusteOpen(false)
+        setAjusteSuccess('')
+      }, 1200)
+    } catch (err) {
+      setAjusteError(err instanceof Error ? err.message : 'Erro ao ajustar estoque.')
+    } finally {
+      setAjusteLoading(false)
+    }
+  }
+
+  // === Handlers Novo Produto ===
+  const openNovoProduto = () => {
+    setNovoCodigoMl('')
+    setNovoDescricao('')
+    setNovoFornecedor('')
+    setNovoQtdInicial('')
+    setNovoProdError('')
+    setNovoProdSuccess('')
+    setNovoProdOpen(true)
+  }
+
+  const handleNovoProduto = async () => {
+    if (!novoCodigoMl.trim() || !novoDescricao.trim() || !novoFornecedor.trim()) {
+      setNovoProdError('Preencha Código ML, descrição e fornecedor.')
+      return
+    }
+    setNovoProdLoading(true)
+    setNovoProdError('')
+    try {
+      await cadastrarProduto({
+        codigo_ml: novoCodigoMl.trim().toUpperCase(),
+        descricao: novoDescricao.trim(),
+        fornecedor: novoFornecedor.trim(),
+      })
+      // Se informou qtd inicial, criar movimentação
+      const qtdIni = parseInt(novoQtdInicial, 10)
+      if (!isNaN(qtdIni) && qtdIni > 0) {
+        await ajustarEstoque({
+          codigo_ml: novoCodigoMl.trim().toUpperCase(),
+          produto: novoDescricao.trim(),
+          quantidade: qtdIni,
+          motivo: 'CORRECAO_INVENTARIO',
+          observacao: 'Estoque inicial no cadastro',
+        })
+      }
+      setNovoProdSuccess(`Produto ${novoCodigoMl.trim().toUpperCase()} cadastrado!`)
+      await carregarEstoque()
+      setTimeout(() => {
+        setNovoProdOpen(false)
+        setNovoProdSuccess('')
+      }, 1200)
+    } catch (err) {
+      setNovoProdError(err instanceof Error ? err.message : 'Erro ao cadastrar produto.')
+    } finally {
+      setNovoProdLoading(false)
+    }
+  }
+
   if (loading) {
     return <div className="text-center py-12 text-crunch-ink-mute">Carregando estoque...</div>
   }
 
   return (
     <div className="space-y-4 animate-fade-in-up">
-      {/* Busca + Filtro Fornecedor */}
+      {/* Busca + Filtro + Ações */}
       <div className="flex gap-4 items-center flex-wrap">
         <input
           type="text"
@@ -122,6 +252,12 @@ function TabEstoque() {
             <option key={f} value={f}>{f}</option>
           ))}
         </select>
+        <button
+          onClick={openNovoProduto}
+          className="px-4 py-3 text-sm font-semibold rounded-xl bg-crunch-accent text-white hover:bg-orange-600 transition-colors whitespace-nowrap"
+        >
+          + Novo Produto
+        </button>
         <span className="text-xs text-crunch-ink-mute font-mono">
           {filtrado.length} itens
         </span>
@@ -143,7 +279,8 @@ function TabEstoque() {
                   <th className="text-left px-4 py-3 font-semibold">Fornecedor</th>
                   <th className="text-center px-4 py-3 font-semibold">Disponível</th>
                   <th className="text-right px-4 py-3 font-semibold">Preço Compra</th>
-                  <th className="text-left px-6 py-3 font-semibold">Última Mov.</th>
+                  <th className="text-left px-4 py-3 font-semibold">Última Mov.</th>
+                  <th className="text-center px-4 py-3 font-semibold">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -154,7 +291,7 @@ function TabEstoque() {
                         {item.codigo_ml}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-crunch-ink-dim max-w-[250px] truncate">{item.produto}</td>
+                    <td className="px-4 py-3 text-crunch-ink-dim max-w-[220px] truncate">{item.produto}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs bg-crunch-panel-2 border border-crunch-line-2 px-2 py-0.5 rounded text-crunch-ink-dim">
                         {item.fornecedor_principal || '—'}
@@ -174,7 +311,15 @@ function TabEstoque() {
                     <td className="px-4 py-3 text-right text-xs text-crunch-ink-dim font-mono">
                       {formatPreco(item.preco_compra)}
                     </td>
-                    <td className="px-6 py-3 text-xs text-crunch-ink-mute">{formatDate(item.ultima_movimentacao)}</td>
+                    <td className="px-4 py-3 text-xs text-crunch-ink-mute">{formatDate(item.ultima_movimentacao)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => openAjuste(item)}
+                        className="px-3 py-1 text-[11px] font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:text-crunch-accent hover:border-crunch-accent transition-colors"
+                      >
+                        Ajustar
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -182,6 +327,201 @@ function TabEstoque() {
           </div>
         )}
       </div>
+
+      {/* ========== MODAL AJUSTE DE ESTOQUE ========== */}
+      {ajusteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAjusteOpen(false)} />
+          <div className="relative bg-crunch-panel border border-crunch-line rounded-2xl p-8 max-w-md w-full mx-4 animate-fade-in-up">
+            <h3 className="text-xl font-semibold mb-1">Ajustar Estoque</h3>
+            <p className="text-xs text-crunch-ink-mute mb-6">
+              <span className="font-mono text-crunch-accent">{ajusteItem?.codigo_ml}</span>
+              {' — '}{ajusteItem?.produto}
+              {' — Saldo atual: '}<b className="text-crunch-ink">{ajusteItem?.quantidade_disponivel}</b>
+            </p>
+
+            {ajusteError && (
+              <div className="mb-4 bg-red-900/20 border border-red-800/40 rounded-lg px-4 py-2 text-sm text-red-400">{ajusteError}</div>
+            )}
+            {ajusteSuccess && (
+              <div className="mb-4 bg-green-900/20 border border-green-800/40 rounded-lg px-4 py-2 text-sm text-green-400">{ajusteSuccess}</div>
+            )}
+
+            <div className="space-y-4">
+              {/* Tipo */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setAjusteTipo('saida')}
+                  className={`flex-1 py-2.5 text-sm font-medium rounded-lg border transition-colors ${
+                    ajusteTipo === 'saida'
+                      ? 'bg-red-600/20 border-red-500 text-red-400'
+                      : 'border-crunch-line text-crunch-ink-mute hover:border-crunch-accent'
+                  }`}
+                >
+                  Saída (remover)
+                </button>
+                <button
+                  onClick={() => setAjusteTipo('entrada')}
+                  className={`flex-1 py-2.5 text-sm font-medium rounded-lg border transition-colors ${
+                    ajusteTipo === 'entrada'
+                      ? 'bg-green-600/20 border-green-500 text-green-400'
+                      : 'border-crunch-line text-crunch-ink-mute hover:border-crunch-accent'
+                  }`}
+                >
+                  Entrada (adicionar)
+                </button>
+              </div>
+
+              {/* Quantidade */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Quantidade</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={ajusteQtd}
+                  onChange={(e) => setAjusteQtd(e.target.value)}
+                  placeholder="Ex: 5"
+                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                />
+              </div>
+
+              {/* Motivo */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Motivo</label>
+                <select
+                  value={ajusteMotivo}
+                  onChange={(e) => setAjusteMotivo(e.target.value as MotivoAjuste)}
+                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent appearance-none cursor-pointer"
+                >
+                  {MOTIVOS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Observação */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Observação (opcional)</label>
+                <input
+                  type="text"
+                  value={ajusteObs}
+                  onChange={(e) => setAjusteObs(e.target.value)}
+                  placeholder="Detalhes do ajuste..."
+                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={() => setAjusteOpen(false)}
+                disabled={ajusteLoading}
+                className="px-5 py-2.5 text-sm font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:bg-crunch-panel-2 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAjuste}
+                disabled={ajusteLoading}
+                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-crunch-accent hover:bg-orange-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {ajusteLoading && (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                )}
+                Confirmar Ajuste
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL NOVO PRODUTO ========== */}
+      {novoProdOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setNovoProdOpen(false)} />
+          <div className="relative bg-crunch-panel border border-crunch-line rounded-2xl p-8 max-w-md w-full mx-4 animate-fade-in-up">
+            <h3 className="text-xl font-semibold mb-1">Novo Produto</h3>
+            <p className="text-xs text-crunch-ink-mute mb-6">Cadastre um novo produto no sistema.</p>
+
+            {novoProdError && (
+              <div className="mb-4 bg-red-900/20 border border-red-800/40 rounded-lg px-4 py-2 text-sm text-red-400">{novoProdError}</div>
+            )}
+            {novoProdSuccess && (
+              <div className="mb-4 bg-green-900/20 border border-green-800/40 rounded-lg px-4 py-2 text-sm text-green-400">{novoProdSuccess}</div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Código ML</label>
+                <input
+                  type="text"
+                  value={novoCodigoMl}
+                  onChange={(e) => setNovoCodigoMl(e.target.value)}
+                  placeholder="Ex: ZRTB80652"
+                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink font-mono focus:outline-none focus:border-crunch-accent"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Descrição</label>
+                <input
+                  type="text"
+                  value={novoDescricao}
+                  onChange={(e) => setNovoDescricao(e.target.value)}
+                  placeholder="Ex: Whey Protein 1,8kg Chocolate"
+                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Fornecedor</label>
+                <input
+                  type="text"
+                  value={novoFornecedor}
+                  onChange={(e) => setNovoFornecedor(e.target.value)}
+                  placeholder="Ex: Vitafor"
+                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Quantidade Inicial (opcional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={novoQtdInicial}
+                  onChange={(e) => setNovoQtdInicial(e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={() => setNovoProdOpen(false)}
+                disabled={novoProdLoading}
+                className="px-5 py-2.5 text-sm font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:bg-crunch-panel-2 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleNovoProduto}
+                disabled={novoProdLoading}
+                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-crunch-accent hover:bg-orange-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {novoProdLoading && (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                )}
+                Cadastrar Produto
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -211,7 +551,6 @@ function TabEnviarFull() {
     setFileName(file.name)
     setErrors([])
 
-    // Ler como texto bruto para parsing customizado
     const reader = new FileReader()
     reader.onload = (ev) => {
       const text = ev.target?.result as string
@@ -242,7 +581,6 @@ function TabEnviarFull() {
     setErrors([])
 
     try {
-      // Validar contra estoque
       const validationErrors = await validarCSVFull(csvItens)
       if (validationErrors.length > 0) {
         setErrors(validationErrors)
@@ -251,7 +589,6 @@ function TabEnviarFull() {
         return
       }
 
-      // Processar envio com dados do cabeçalho
       await processarEnvioFull(csvItens, csvHeader || undefined)
       setConfirmOpen(false)
       setStep('success')
@@ -306,7 +643,6 @@ function TabEnviarFull() {
 
       {step === 'preview' && (
         <div className="space-y-6">
-          {/* Dados do cabeçalho */}
           {csvHeader && (
             <div className="bg-crunch-panel border border-crunch-line rounded-xl px-6 py-4 flex flex-wrap gap-6">
               <div>
@@ -417,14 +753,11 @@ function TabEnviarFull() {
 
 /**
  * Parser customizado para o CSV de envio FULL da Crunch.
- * Lê cabeçalho (DATA, NF, ENVIO ML N°) e itens (FORNECEDOR, ML, QTD).
- * Agrupa produtos duplicados somando quantidades.
  */
 function parseCSVFull(text: string): { header: CSVFullHeader; itens: CSVFullItem[]; errors: string[] } {
   const lines = text.split('\n').map(l => l.replace(/\r$/, ''))
   const errors: string[] = []
 
-  // 1) Extrair cabeçalho — procurar linha que contém DATA, NF e ENVIO ML
   let header: CSVFullHeader = { data_envio: '', numero_nf: '', codigo_envio_ml: '' }
 
   for (let i = 0; i < Math.min(lines.length, 10); i++) {
@@ -445,7 +778,6 @@ function parseCSVFull(text: string): { header: CSVFullHeader; itens: CSVFullItem
     }
   }
 
-  // 2) Encontrar linha de cabeçalho dos itens — contém "ML" e "QTD"
   let itemHeaderIdx = -1
   const colMap = { item: -1, fornecedor: -1, ml: -1, variacao: -1, qtd: -1 }
 
@@ -470,14 +802,12 @@ function parseCSVFull(text: string): { header: CSVFullHeader; itens: CSVFullItem
     return { header, itens: [], errors }
   }
 
-  // 3) Ler itens — linhas após o cabeçalho dos itens
   const rawItens: CSVFullItem[] = []
 
   for (let i = itemHeaderIdx + 1; i < lines.length; i++) {
     const line = lines[i]
     if (!line.trim()) continue
 
-    // Usar PapaParse para lidar com aspas em campos
     const parsed = Papa.parse(line, { header: false })
     const cells = (parsed.data[0] as string[]) || []
     if (!cells || cells.length <= colMap.ml) continue
@@ -486,7 +816,6 @@ function parseCSVFull(text: string): { header: CSVFullHeader; itens: CSVFullItem
     const qtdStr = cells[colMap.qtd]?.trim() || ''
     const qtd = parseInt(qtdStr, 10)
 
-    // Pular linhas sem código ML ou com texto de resumo
     if (!codigoML || codigoML.length < 4) continue
     if (isNaN(qtd) || qtd <= 0) continue
 
@@ -505,7 +834,6 @@ function parseCSVFull(text: string): { header: CSVFullHeader; itens: CSVFullItem
     })
   }
 
-  // 4) Agrupar duplicados (mesmo codigo_ml) somando quantidades
   const agrupado = new Map<string, CSVFullItem>()
   for (const item of rawItens) {
     const existing = agrupado.get(item.codigo_ml)
@@ -609,7 +937,6 @@ function TabHistorico() {
                 </button>
               </div>
 
-              {/* Detalhes do envio (expandido) */}
               {viewEnvio?.id === envio.id && (
                 <div className="mt-4 pt-4 border-t border-crunch-line/50">
                   {viewLoading ? (
