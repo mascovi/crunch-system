@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
 import { listarEstoque, ajustarEstoque, cadastrarProduto } from '@/services/estoque'
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste } from '@/types'
 import ConfirmModal from '@/components/ConfirmModal'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+  PieLabelRenderProps,
+} from 'recharts'
 
 type Tab = 'estoque' | 'enviar-full' | 'historico'
 
@@ -19,55 +24,61 @@ const MOTIVOS: { value: MotivoAjuste; label: string }[] = [
   { value: 'OUTRO', label: 'Outro' },
 ]
 
+const PIE_COLORS = ['#ff6a00', '#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#c2410c', '#9a3412']
+
 export default function EstoquePage() {
   const [tab, setTab] = useState<Tab>('estoque')
 
   return (
-    <div className="max-w-[1080px] mx-auto px-8 py-20">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-10">
-        <Link
-          href="/"
-          className="w-9 h-9 rounded-lg border border-crunch-line flex items-center justify-center text-crunch-ink-mute hover:text-crunch-accent hover:border-crunch-accent transition-colors"
-        >
-          &larr;
-        </Link>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Estoque</h1>
-          <p className="text-sm text-crunch-ink-mute mt-1">Saldo por Código ML, envios FULL e histórico</p>
+    <div className="min-h-screen bg-[#f8f9fc]">
+      {/* Top bar */}
+      <div className="bg-white border-b border-gray-200 px-8 py-4">
+        <div className="max-w-[1200px] mx-auto flex items-center gap-4">
+          <Link
+            href="/"
+            className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#ff6a00] hover:border-[#ff6a00] transition-colors bg-white"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">Estoque</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Saldo por Código ML, envios FULL e histórico</p>
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-8 bg-crunch-panel rounded-xl p-1 border border-crunch-line w-fit">
-        {[
-          { id: 'estoque' as Tab, label: 'Estoque' },
-          { id: 'enviar-full' as Tab, label: 'Enviar FULL' },
-          { id: 'historico' as Tab, label: 'Histórico FULL' },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-5 py-2 text-sm font-medium rounded-lg transition-colors ${
-              tab === t.id
-                ? 'bg-crunch-accent text-white'
-                : 'text-crunch-ink-mute hover:text-crunch-ink'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <div className="max-w-[1200px] mx-auto px-8 py-6">
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-white rounded-xl p-1 border border-gray-200 w-fit shadow-sm">
+          {[
+            { id: 'estoque' as Tab, label: 'Estoque' },
+            { id: 'enviar-full' as Tab, label: 'Enviar FULL' },
+            { id: 'historico' as Tab, label: 'Histórico FULL' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-5 py-2 text-sm font-medium rounded-lg transition-colors ${
+                tab === t.id
+                  ? 'bg-[#ff6a00] text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-      {tab === 'estoque' && <TabEstoque />}
-      {tab === 'enviar-full' && <TabEnviarFull />}
-      {tab === 'historico' && <TabHistorico />}
+        {tab === 'estoque' && <TabEstoque />}
+        {tab === 'enviar-full' && <TabEnviarFull />}
+        {tab === 'historico' && <TabHistorico />}
+      </div>
     </div>
   )
 }
 
 // ============================================
-// TAB: ESTOQUE
+// TAB: ESTOQUE (REDESIGN)
 // ============================================
 function TabEstoque() {
   const [estoque, setEstoque] = useState<SaldoEstoque[]>([])
@@ -96,6 +107,10 @@ function TabEstoque() {
   const [novoProdError, setNovoProdError] = useState('')
   const [novoProdSuccess, setNovoProdSuccess] = useState('')
 
+  // Sort
+  const [sortCol, setSortCol] = useState<'produto' | 'quantidade' | 'fornecedor' | 'preco'>('produto')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
   const carregarEstoque = useCallback(async () => {
     setLoading(true)
     try {
@@ -112,18 +127,74 @@ function TabEstoque() {
     carregarEstoque()
   }, [carregarEstoque])
 
-  // Extrair fornecedores para o dropdown
+  // Fornecedores
   const fornecedores = Array.from(
     new Set(estoque.map((item) => item.fornecedor_principal).filter(Boolean))
   ).sort()
 
-  const filtrado = estoque.filter((item) => {
-    const matchBusca =
-      item.codigo_ml.toLowerCase().includes(busca.toLowerCase()) ||
-      item.produto.toLowerCase().includes(busca.toLowerCase())
-    const matchFornecedor = !filtroFornecedor || item.fornecedor_principal === filtroFornecedor
-    return matchBusca && matchFornecedor
-  })
+  // Filtro + busca
+  const filtrado = useMemo(() => {
+    let items = estoque.filter((item) => {
+      const matchBusca =
+        item.codigo_ml.toLowerCase().includes(busca.toLowerCase()) ||
+        item.produto.toLowerCase().includes(busca.toLowerCase())
+      const matchFornecedor = !filtroFornecedor || item.fornecedor_principal === filtroFornecedor
+      return matchBusca && matchFornecedor
+    })
+
+    // Sort
+    items.sort((a, b) => {
+      let cmp = 0
+      switch (sortCol) {
+        case 'produto':
+          cmp = a.produto.localeCompare(b.produto)
+          break
+        case 'quantidade':
+          cmp = a.quantidade_disponivel - b.quantidade_disponivel
+          break
+        case 'fornecedor':
+          cmp = (a.fornecedor_principal || '').localeCompare(b.fornecedor_principal || '')
+          break
+        case 'preco':
+          cmp = a.preco_compra - b.preco_compra
+          break
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+
+    return items
+  }, [estoque, busca, filtroFornecedor, sortCol, sortDir])
+
+  // KPIs
+  const totalSKUs = estoque.length
+  const totalUnidades = estoque.reduce((s, i) => s + i.quantidade_disponivel, 0)
+  const valorTotal = estoque.reduce((s, i) => s + (i.preco_compra * Math.max(0, i.quantidade_disponivel)), 0)
+  const alertaCount = estoque.filter((i) => i.quantidade_disponivel < 10).length
+  const zeradoCount = estoque.filter((i) => i.quantidade_disponivel <= 0).length
+
+  // Chart: distribuição por fornecedor
+  const chartFornecedor = useMemo(() => {
+    const mapa = new Map<string, number>()
+    estoque.forEach((i) => {
+      const f = i.fornecedor_principal || 'Sem fornecedor'
+      mapa.set(f, (mapa.get(f) || 0) + i.quantidade_disponivel)
+    })
+    return Array.from(mapa.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [estoque])
+
+  // Chart: top 10 produtos por quantidade
+  const chartTopProdutos = useMemo(() => {
+    return [...estoque]
+      .sort((a, b) => b.quantidade_disponivel - a.quantidade_disponivel)
+      .slice(0, 10)
+      .map((i) => ({
+        name: i.produto.length > 25 ? i.produto.substring(0, 25) + '...' : i.produto,
+        qtd: i.quantidade_disponivel,
+        fullName: i.produto,
+      }))
+  }, [estoque])
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '—'
@@ -135,6 +206,21 @@ function TabEstoque() {
     if (!valor || valor === 0) return '—'
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   }
+
+  const handleSort = (col: typeof sortCol) => {
+    if (sortCol === col) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(col)
+      setSortDir('asc')
+    }
+  }
+
+  const SortIcon = ({ col }: { col: typeof sortCol }) => (
+    <span className="ml-1 text-[9px]">
+      {sortCol === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+    </span>
+  )
 
   // === Handlers Ajuste ===
   const openAjuste = (item: SaldoEstoque) => {
@@ -203,7 +289,6 @@ function TabEstoque() {
         descricao: novoDescricao.trim(),
         fornecedor: novoFornecedor.trim(),
       })
-      // Se informou qtd inicial, criar movimentação
       const qtdIni = parseInt(novoQtdInicial, 10)
       if (!isNaN(qtdIni) && qtdIni > 0) {
         await ajustarEstoque({
@@ -227,101 +312,273 @@ function TabEstoque() {
     }
   }
 
+  // Badge de alerta
+  const getStockBadge = (qtd: number) => {
+    if (qtd <= 0) return { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500', label: 'Zerado' }
+    if (qtd < 10) return { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500', label: 'Baixo' }
+    return { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500', label: '' }
+  }
+
   if (loading) {
-    return <div className="text-center py-12 text-crunch-ink-mute">Carregando estoque...</div>
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="flex items-center gap-3 text-gray-400">
+          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-sm">Carregando estoque...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-4 animate-fade-in-up">
-      {/* Busca + Filtro + Ações */}
-      <div className="flex gap-4 items-center flex-wrap">
-        <input
-          type="text"
-          placeholder="Buscar por Código ML ou produto..."
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="flex-1 min-w-[200px] bg-crunch-panel border border-crunch-line rounded-xl px-4 py-3 text-sm text-crunch-ink placeholder:text-crunch-ink-mute focus:outline-none focus:border-crunch-accent transition-colors"
-        />
-        <select
-          value={filtroFornecedor}
-          onChange={(e) => setFiltroFornecedor(e.target.value)}
-          className="bg-crunch-panel border border-crunch-line rounded-xl px-4 py-3 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent transition-colors appearance-none cursor-pointer"
-        >
-          <option value="">Todos os fornecedores</option>
-          {fornecedores.map((f) => (
-            <option key={f} value={f}>{f}</option>
-          ))}
-        </select>
-        <button
-          onClick={openNovoProduto}
-          className="px-4 py-3 text-sm font-semibold rounded-xl bg-crunch-accent text-white hover:bg-orange-600 transition-colors whitespace-nowrap"
-        >
-          + Novo Produto
-        </button>
-        <span className="text-xs text-crunch-ink-mute font-mono">
-          {filtrado.length} itens
-        </span>
+    <div className="space-y-6">
+      {/* ========== KPI CARDS ========== */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total SKUs */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Total SKUs</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="#3b82f6" strokeWidth="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="#3b82f6" strokeWidth="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="#3b82f6" strokeWidth="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="#3b82f6" strokeWidth="1.5"/></svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-gray-900">{totalSKUs}</div>
+          <p className="text-xs text-gray-400 mt-1">produtos cadastrados</p>
+        </div>
+
+        {/* Total Unidades */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Unidades</span>
+            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="#22c55e" strokeWidth="2" strokeLinecap="round"/></svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-gray-900">{totalUnidades.toLocaleString('pt-BR')}</div>
+          <p className="text-xs text-gray-400 mt-1">em estoque</p>
+        </div>
+
+        {/* Valor Total */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Valor Total</span>
+            <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v14M5 4h4.5a2.5 2.5 0 010 5H5M5 9h5a2.5 2.5 0 010 5H5" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-gray-900">{valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+          <p className="text-xs text-gray-400 mt-1">preço médio × quantidade</p>
+        </div>
+
+        {/* Alertas */}
+        <div className={`rounded-xl border p-5 shadow-sm ${alertaCount > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center justify-between mb-3">
+            <span className={`text-xs font-medium uppercase tracking-wider ${alertaCount > 0 ? 'text-red-500' : 'text-gray-400'}`}>Alertas</span>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${alertaCount > 0 ? 'bg-red-100' : 'bg-gray-50'}`}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 5v3M8 11h.01M3.5 14h9a1 1 0 00.87-1.49l-4.5-8a1 1 0 00-1.74 0l-4.5 8A1 1 0 003.5 14z" stroke={alertaCount > 0 ? '#ef4444' : '#9ca3af'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          </div>
+          <div className={`text-2xl font-bold ${alertaCount > 0 ? 'text-red-700' : 'text-gray-900'}`}>{alertaCount}</div>
+          <p className={`text-xs mt-1 ${alertaCount > 0 ? 'text-red-500' : 'text-gray-400'}`}>
+            {zeradoCount > 0 ? `${zeradoCount} zerado${zeradoCount > 1 ? 's' : ''} · ` : ''}{alertaCount} abaixo de 10
+          </p>
+        </div>
       </div>
 
-      {/* Tabela */}
-      <div className="bg-crunch-panel border border-crunch-line rounded-2xl overflow-hidden">
+      {/* ========== CHARTS ========== */}
+      {estoque.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Bar: Top 10 Produtos */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Top 10 Produtos por Quantidade</h3>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartTopProdutos} layout="vertical" margin={{ left: 10, right: 20, top: 0, bottom: 0 }}>
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
+                    formatter={(value) => [String(value), 'Qtd']}
+                  />
+                  <Bar dataKey="qtd" fill="#ff6a00" radius={[0, 4, 4, 0]} barSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Pie: Distribuição por Fornecedor */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Distribuição por Fornecedor</h3>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartFornecedor}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={(props: PieLabelRenderProps) => `${props.name || ''} (${((props.percent || 0) * 100).toFixed(0)}%)`}
+                    labelLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+                  >
+                    {chartFornecedor.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
+                    formatter={(value) => [String(value), 'unidades']}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== TOOLBAR: Busca + Filtro + Ações ========== */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <div className="flex gap-3 items-center flex-wrap">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[240px]">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <input
+              type="text"
+              placeholder="Buscar por Código ML ou produto..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00] transition-all"
+            />
+          </div>
+          {/* Filtro Fornecedor */}
+          <select
+            value={filtroFornecedor}
+            onChange={(e) => setFiltroFornecedor(e.target.value)}
+            className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00] appearance-none cursor-pointer min-w-[180px]"
+          >
+            <option value="">Todos os fornecedores</option>
+            {fornecedores.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+          {/* Botão Novo Produto */}
+          <button
+            onClick={openNovoProduto}
+            className="px-4 py-2.5 text-sm font-semibold rounded-lg bg-[#ff6a00] text-white hover:bg-orange-600 transition-colors whitespace-nowrap shadow-sm flex items-center gap-2"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            Novo Produto
+          </button>
+          {/* Counter */}
+          <span className="text-xs text-gray-400 font-medium ml-auto">
+            {filtrado.length} de {estoque.length} itens
+          </span>
+        </div>
+      </div>
+
+      {/* ========== TABELA ========== */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {filtrado.length === 0 ? (
-          <div className="px-6 py-12 text-center text-crunch-ink-mute text-sm">
+          <div className="px-6 py-16 text-center text-gray-400 text-sm">
             {estoque.length === 0 ? 'Estoque vazio. Confirme o recebimento de uma NF para dar entrada.' : 'Nenhum resultado encontrado.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-crunch-ink-mute border-b border-crunch-line">
-                  <th className="text-left px-6 py-3 font-semibold">Código ML</th>
-                  <th className="text-left px-4 py-3 font-semibold">Produto</th>
-                  <th className="text-left px-4 py-3 font-semibold">Fornecedor</th>
-                  <th className="text-center px-4 py-3 font-semibold">Disponível</th>
-                  <th className="text-right px-4 py-3 font-semibold">Preço Compra</th>
-                  <th className="text-left px-4 py-3 font-semibold">Última Mov.</th>
-                  <th className="text-center px-4 py-3 font-semibold">Ações</th>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Código ML</th>
+                  <th
+                    className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none"
+                    onClick={() => handleSort('produto')}
+                  >
+                    Produto<SortIcon col="produto" />
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none"
+                    onClick={() => handleSort('fornecedor')}
+                  >
+                    Fornecedor<SortIcon col="fornecedor" />
+                  </th>
+                  <th
+                    className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none"
+                    onClick={() => handleSort('quantidade')}
+                  >
+                    Disponível<SortIcon col="quantidade" />
+                  </th>
+                  <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                  <th
+                    className="text-right px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none"
+                    onClick={() => handleSort('preco')}
+                  >
+                    Preço Compra<SortIcon col="preco" />
+                  </th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Última Mov.</th>
+                  <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {filtrado.map((item) => (
-                  <tr key={item.codigo_ml} className="border-b border-crunch-line/50 hover:bg-crunch-panel-2/50 transition-colors">
-                    <td className="px-6 py-3">
-                      <span className="font-mono text-xs bg-crunch-accent/10 text-crunch-accent border border-crunch-accent/30 px-2 py-0.5 rounded">
-                        {item.codigo_ml}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-crunch-ink-dim max-w-[220px] truncate">{item.produto}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs bg-crunch-panel-2 border border-crunch-line-2 px-2 py-0.5 rounded text-crunch-ink-dim">
-                        {item.fornecedor_principal || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`font-semibold ${
-                        item.quantidade_disponivel <= 0
-                          ? 'text-red-400'
-                          : item.quantidade_disponivel <= 5
-                          ? 'text-yellow-400'
-                          : 'text-green-400'
-                      }`}>
-                        {item.quantidade_disponivel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs text-crunch-ink-dim font-mono">
-                      {formatPreco(item.preco_compra)}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-crunch-ink-mute">{formatDate(item.ultima_movimentacao)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => openAjuste(item)}
-                        className="px-3 py-1 text-[11px] font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:text-crunch-accent hover:border-crunch-accent transition-colors"
-                      >
-                        Ajustar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filtrado.map((item) => {
+                  const badge = getStockBadge(item.quantidade_disponivel)
+                  return (
+                    <tr key={item.codigo_ml} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
+                      <td className="px-5 py-3">
+                        <span className="font-mono text-xs bg-orange-50 text-[#ff6a00] border border-orange-200 px-2 py-0.5 rounded font-medium">
+                          {item.codigo_ml}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 max-w-[220px] truncate font-medium">{item.produto}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-gray-600">
+                          {item.fornecedor_principal || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`font-bold text-base ${
+                          item.quantidade_disponivel <= 0 ? 'text-red-600' :
+                          item.quantidade_disponivel < 10 ? 'text-amber-600' :
+                          'text-gray-900'
+                        }`}>
+                          {item.quantidade_disponivel}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {item.quantidade_disponivel < 10 && (
+                          <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${badge.bg} ${badge.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                            {badge.label}
+                          </span>
+                        )}
+                        {item.quantidade_disponivel >= 10 && (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                            OK
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-gray-500 font-mono">
+                        {formatPreco(item.preco_compra)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-400">{formatDate(item.ultima_movimentacao)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => openAjuste(item)}
+                          className="px-3 py-1.5 text-[11px] font-medium rounded-lg border border-gray-200 text-gray-500 hover:text-[#ff6a00] hover:border-[#ff6a00] transition-colors bg-white"
+                        >
+                          Ajustar
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -331,20 +588,20 @@ function TabEstoque() {
       {/* ========== MODAL AJUSTE DE ESTOQUE ========== */}
       {ajusteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAjusteOpen(false)} />
-          <div className="relative bg-crunch-panel border border-crunch-line rounded-2xl p-8 max-w-md w-full mx-4 animate-fade-in-up">
-            <h3 className="text-xl font-semibold mb-1">Ajustar Estoque</h3>
-            <p className="text-xs text-crunch-ink-mute mb-6">
-              <span className="font-mono text-crunch-accent">{ajusteItem?.codigo_ml}</span>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAjusteOpen(false)} />
+          <div className="relative bg-white border border-gray-200 rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Ajustar Estoque</h3>
+            <p className="text-xs text-gray-400 mb-6">
+              <span className="font-mono text-[#ff6a00] font-medium">{ajusteItem?.codigo_ml}</span>
               {' — '}{ajusteItem?.produto}
-              {' — Saldo atual: '}<b className="text-crunch-ink">{ajusteItem?.quantidade_disponivel}</b>
+              {' — Saldo atual: '}<b className="text-gray-900">{ajusteItem?.quantidade_disponivel}</b>
             </p>
 
             {ajusteError && (
-              <div className="mb-4 bg-red-900/20 border border-red-800/40 rounded-lg px-4 py-2 text-sm text-red-400">{ajusteError}</div>
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-sm text-red-600">{ajusteError}</div>
             )}
             {ajusteSuccess && (
-              <div className="mb-4 bg-green-900/20 border border-green-800/40 rounded-lg px-4 py-2 text-sm text-green-400">{ajusteSuccess}</div>
+              <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-600">{ajusteSuccess}</div>
             )}
 
             <div className="space-y-4">
@@ -354,8 +611,8 @@ function TabEstoque() {
                   onClick={() => setAjusteTipo('saida')}
                   className={`flex-1 py-2.5 text-sm font-medium rounded-lg border transition-colors ${
                     ajusteTipo === 'saida'
-                      ? 'bg-red-600/20 border-red-500 text-red-400'
-                      : 'border-crunch-line text-crunch-ink-mute hover:border-crunch-accent'
+                      ? 'bg-red-50 border-red-300 text-red-600'
+                      : 'border-gray-200 text-gray-400 hover:border-gray-300'
                   }`}
                 >
                   Saída (remover)
@@ -364,8 +621,8 @@ function TabEstoque() {
                   onClick={() => setAjusteTipo('entrada')}
                   className={`flex-1 py-2.5 text-sm font-medium rounded-lg border transition-colors ${
                     ajusteTipo === 'entrada'
-                      ? 'bg-green-600/20 border-green-500 text-green-400'
-                      : 'border-crunch-line text-crunch-ink-mute hover:border-crunch-accent'
+                      ? 'bg-green-50 border-green-300 text-green-600'
+                      : 'border-gray-200 text-gray-400 hover:border-gray-300'
                   }`}
                 >
                   Entrada (adicionar)
@@ -374,24 +631,24 @@ function TabEstoque() {
 
               {/* Quantidade */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Quantidade</label>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Quantidade</label>
                 <input
                   type="number"
                   min="1"
                   value={ajusteQtd}
                   onChange={(e) => setAjusteQtd(e.target.value)}
                   placeholder="Ex: 5"
-                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
                 />
               </div>
 
               {/* Motivo */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Motivo</label>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Motivo</label>
                 <select
                   value={ajusteMotivo}
                   onChange={(e) => setAjusteMotivo(e.target.value as MotivoAjuste)}
-                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent appearance-none cursor-pointer"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00] appearance-none cursor-pointer"
                 >
                   {MOTIVOS.map((m) => (
                     <option key={m.value} value={m.value}>{m.label}</option>
@@ -401,13 +658,13 @@ function TabEstoque() {
 
               {/* Observação */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Observação (opcional)</label>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Observação (opcional)</label>
                 <input
                   type="text"
                   value={ajusteObs}
                   onChange={(e) => setAjusteObs(e.target.value)}
                   placeholder="Detalhes do ajuste..."
-                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
                 />
               </div>
             </div>
@@ -416,14 +673,14 @@ function TabEstoque() {
               <button
                 onClick={() => setAjusteOpen(false)}
                 disabled={ajusteLoading}
-                className="px-5 py-2.5 text-sm font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:bg-crunch-panel-2 transition-colors disabled:opacity-50"
+                className="px-5 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAjuste}
                 disabled={ajusteLoading}
-                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-crunch-accent hover:bg-orange-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[#ff6a00] hover:bg-orange-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
               >
                 {ajusteLoading && (
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -441,58 +698,58 @@ function TabEstoque() {
       {/* ========== MODAL NOVO PRODUTO ========== */}
       {novoProdOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setNovoProdOpen(false)} />
-          <div className="relative bg-crunch-panel border border-crunch-line rounded-2xl p-8 max-w-md w-full mx-4 animate-fade-in-up">
-            <h3 className="text-xl font-semibold mb-1">Novo Produto</h3>
-            <p className="text-xs text-crunch-ink-mute mb-6">Cadastre um novo produto no sistema.</p>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setNovoProdOpen(false)} />
+          <div className="relative bg-white border border-gray-200 rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Novo Produto</h3>
+            <p className="text-xs text-gray-400 mb-6">Cadastre um novo produto no sistema.</p>
 
             {novoProdError && (
-              <div className="mb-4 bg-red-900/20 border border-red-800/40 rounded-lg px-4 py-2 text-sm text-red-400">{novoProdError}</div>
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-sm text-red-600">{novoProdError}</div>
             )}
             {novoProdSuccess && (
-              <div className="mb-4 bg-green-900/20 border border-green-800/40 rounded-lg px-4 py-2 text-sm text-green-400">{novoProdSuccess}</div>
+              <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-600">{novoProdSuccess}</div>
             )}
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Código ML</label>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Código ML</label>
                 <input
                   type="text"
                   value={novoCodigoMl}
                   onChange={(e) => setNovoCodigoMl(e.target.value)}
                   placeholder="Ex: ZRTB80652"
-                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink font-mono focus:outline-none focus:border-crunch-accent"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Descrição</label>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Descrição</label>
                 <input
                   type="text"
                   value={novoDescricao}
                   onChange={(e) => setNovoDescricao(e.target.value)}
                   placeholder="Ex: Whey Protein 1,8kg Chocolate"
-                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Fornecedor</label>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Fornecedor</label>
                 <input
                   type="text"
                   value={novoFornecedor}
                   onChange={(e) => setNovoFornecedor(e.target.value)}
                   placeholder="Ex: Vitafor"
-                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-crunch-ink-mute font-semibold block mb-1">Quantidade Inicial (opcional)</label>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Quantidade Inicial (opcional)</label>
                 <input
                   type="number"
                   min="0"
                   value={novoQtdInicial}
                   onChange={(e) => setNovoQtdInicial(e.target.value)}
                   placeholder="0"
-                  className="w-full bg-crunch-bg border border-crunch-line rounded-lg px-4 py-2.5 text-sm text-crunch-ink focus:outline-none focus:border-crunch-accent"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
                 />
               </div>
             </div>
@@ -501,14 +758,14 @@ function TabEstoque() {
               <button
                 onClick={() => setNovoProdOpen(false)}
                 disabled={novoProdLoading}
-                className="px-5 py-2.5 text-sm font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:bg-crunch-panel-2 transition-colors disabled:opacity-50"
+                className="px-5 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleNovoProduto}
                 disabled={novoProdLoading}
-                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-crunch-accent hover:bg-orange-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[#ff6a00] hover:bg-orange-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
               >
                 {novoProdLoading && (
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -612,18 +869,18 @@ function TabEnviarFull() {
   const totalItens = csvItens.reduce((s, i) => s + i.quantidade, 0)
 
   return (
-    <div className="animate-fade-in-up">
+    <div>
       {errors.length > 0 && (
-        <div className="mb-6 bg-red-900/20 border border-red-800/40 rounded-xl p-4 space-y-1">
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 space-y-1">
           {errors.map((err, i) => (
-            <p key={i} className="text-sm text-red-400">{err}</p>
+            <p key={i} className="text-sm text-red-600">{err}</p>
           ))}
         </div>
       )}
 
       {step === 'upload' && (
         <div
-          className="bg-crunch-panel border-2 border-dashed border-crunch-line rounded-2xl p-16 text-center cursor-pointer hover:border-crunch-accent transition-colors"
+          className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-16 text-center cursor-pointer hover:border-[#ff6a00] transition-colors"
           onClick={() => fileInputRef.current?.click()}
         >
           <input
@@ -633,9 +890,9 @@ function TabEnviarFull() {
             onChange={handleFileSelect}
             className="hidden"
           />
-          <div className="text-4xl mb-4 text-crunch-accent">&uarr;</div>
-          <h2 className="text-lg font-semibold mb-2">Enviar CSV FULL</h2>
-          <p className="text-sm text-crunch-ink-mute mb-4">
+          <div className="text-4xl mb-4 text-[#ff6a00]">&uarr;</div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Enviar CSV FULL</h2>
+          <p className="text-sm text-gray-400 mb-4">
             Use a planilha padrão de controle de envio (CONTROLE ENVIO CODIGO).
           </p>
         </div>
@@ -644,35 +901,35 @@ function TabEnviarFull() {
       {step === 'preview' && (
         <div className="space-y-6">
           {csvHeader && (
-            <div className="bg-crunch-panel border border-crunch-line rounded-xl px-6 py-4 flex flex-wrap gap-6">
+            <div className="bg-white border border-gray-200 rounded-xl px-6 py-4 flex flex-wrap gap-6 shadow-sm">
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-crunch-ink-mute block">Data do Envio</span>
-                <span className="text-sm font-semibold">{csvHeader.data_envio}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-400 block">Data do Envio</span>
+                <span className="text-sm font-semibold text-gray-900">{csvHeader.data_envio}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-crunch-ink-mute block">NF</span>
-                <span className="text-sm font-semibold">{csvHeader.numero_nf || '—'}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-400 block">NF</span>
+                <span className="text-sm font-semibold text-gray-900">{csvHeader.numero_nf || '—'}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-crunch-ink-mute block">Envio ML N&deg;</span>
-                <span className="text-sm font-mono font-semibold text-crunch-accent">{csvHeader.codigo_envio_ml}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-400 block">Envio ML N&deg;</span>
+                <span className="text-sm font-mono font-semibold text-[#ff6a00]">{csvHeader.codigo_envio_ml}</span>
               </div>
             </div>
           )}
 
-          <div className="bg-crunch-panel border border-crunch-line rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-crunch-line flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-crunch-ink-dim">
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Itens do envio — {fileName}
               </h3>
-              <span className="text-xs font-mono text-crunch-accent">
+              <span className="text-xs font-mono text-[#ff6a00] font-medium">
                 {csvItens.length} códigos &middot; {totalItens} unidades
               </span>
             </div>
             <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-crunch-panel">
-                  <tr className="text-[10px] uppercase tracking-wider text-crunch-ink-mute border-b border-crunch-line">
+                <thead className="sticky top-0 bg-gray-50">
+                  <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
                     <th className="text-left px-6 py-3 font-semibold">Produto</th>
                     <th className="text-left px-4 py-3 font-semibold">Fornecedor</th>
                     <th className="text-left px-4 py-3 font-semibold">Código ML</th>
@@ -681,17 +938,17 @@ function TabEnviarFull() {
                 </thead>
                 <tbody>
                   {csvItens.map((item, i) => (
-                    <tr key={i} className="border-b border-crunch-line/50">
-                      <td className="px-6 py-3 text-crunch-ink-dim text-xs max-w-[220px] truncate">
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="px-6 py-3 text-gray-600 text-xs max-w-[220px] truncate">
                         {item.descricao || '—'}
                       </td>
-                      <td className="px-4 py-3 text-xs text-crunch-ink-mute">{item.fornecedor || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-400">{item.fornecedor || '—'}</td>
                       <td className="px-4 py-3">
-                        <span className="font-mono text-xs bg-crunch-accent/10 text-crunch-accent border border-crunch-accent/30 px-2 py-0.5 rounded">
+                        <span className="font-mono text-xs bg-orange-50 text-[#ff6a00] border border-orange-200 px-2 py-0.5 rounded">
                           {item.codigo_ml}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center font-medium">{item.quantidade}</td>
+                      <td className="px-4 py-3 text-center font-medium text-gray-900">{item.quantidade}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -702,13 +959,13 @@ function TabEnviarFull() {
           <div className="flex gap-4 justify-end">
             <button
               onClick={handleReset}
-              className="px-6 py-3 text-sm font-medium rounded-xl border border-crunch-line text-crunch-ink-dim hover:bg-crunch-panel-2 transition-colors"
+              className="px-6 py-3 text-sm font-medium rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               onClick={() => setConfirmOpen(true)}
-              className="px-6 py-3 text-sm font-semibold rounded-xl bg-crunch-accent text-white hover:bg-orange-600 transition-colors"
+              className="px-6 py-3 text-sm font-semibold rounded-xl bg-[#ff6a00] text-white hover:bg-orange-600 transition-colors shadow-sm"
             >
               Enviar FULL
             </button>
@@ -717,20 +974,20 @@ function TabEnviarFull() {
       )}
 
       {step === 'success' && (
-        <div className="bg-crunch-panel border border-crunch-line rounded-2xl p-12 text-center">
-          <div className="text-4xl mb-4 text-green-400">&#10003;</div>
-          <h2 className="text-xl font-semibold mb-2">Envio FULL processado</h2>
-          <p className="text-sm text-crunch-ink-dim mb-2">
+        <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center shadow-sm">
+          <div className="text-4xl mb-4 text-green-500">&#10003;</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Envio FULL processado</h2>
+          <p className="text-sm text-gray-600 mb-2">
             {csvItens.length} códigos enviados, {totalItens} unidades subtraídas do estoque.
           </p>
           {csvHeader && (
-            <p className="text-xs text-crunch-ink-mute mb-8">
-              Envio ML: <b className="text-crunch-accent">{csvHeader.codigo_envio_ml}</b> &middot; Data: {csvHeader.data_envio}
+            <p className="text-xs text-gray-400 mb-8">
+              Envio ML: <b className="text-[#ff6a00]">{csvHeader.codigo_envio_ml}</b> &middot; Data: {csvHeader.data_envio}
             </p>
           )}
           <button
             onClick={handleReset}
-            className="px-6 py-3 text-sm font-medium rounded-xl border border-crunch-line text-crunch-ink-dim hover:bg-crunch-panel-2 transition-colors"
+            className="px-6 py-3 text-sm font-medium rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
           >
             Novo envio
           </button>
@@ -889,13 +1146,13 @@ function TabHistorico() {
   }
 
   if (loading) {
-    return <div className="text-center py-12 text-crunch-ink-mute">Carregando histórico...</div>
+    return <div className="text-center py-12 text-gray-400">Carregando hist\u00f3rico...</div>
   }
 
   return (
-    <div className="animate-fade-in-up">
+    <div>
       {envios.length === 0 ? (
-        <div className="bg-crunch-panel border border-crunch-line rounded-2xl px-6 py-12 text-center text-crunch-ink-mute text-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl px-6 py-12 text-center text-gray-400 text-sm shadow-sm">
           Nenhum envio FULL registrado.
         </div>
       ) : (
@@ -903,64 +1160,64 @@ function TabHistorico() {
           {envios.map((envio) => (
             <div
               key={envio.id}
-              className="bg-crunch-panel border border-crunch-line rounded-xl p-5"
+              className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-4 flex-wrap">
                   {envio.codigo_envio_ml && (
-                    <span className="text-xs font-semibold bg-crunch-accent/10 text-crunch-accent border border-crunch-accent/30 px-2.5 py-1 rounded-lg">
+                    <span className="text-xs font-semibold bg-orange-50 text-[#ff6a00] border border-orange-200 px-2.5 py-1 rounded-lg">
                       Envio #{envio.codigo_envio_ml}
                     </span>
                   )}
-                  <span className="text-sm font-semibold">
+                  <span className="text-sm font-semibold text-gray-900">
                     {envio.data_envio_csv
                       ? new Date(envio.data_envio_csv + 'T12:00:00').toLocaleDateString('pt-BR')
                       : formatDate(envio.data_envio)}
                   </span>
                   {envio.numero_nf && (
-                    <span className="text-xs text-crunch-ink-mute">
+                    <span className="text-xs text-gray-400">
                       NF {envio.numero_nf}
                     </span>
                   )}
-                  <span className="text-xs font-mono bg-crunch-panel-2 border border-crunch-line-2 px-2 py-0.5 rounded text-crunch-ink-dim">
-                    {envio.total_codigos} códigos
+                  <span className="text-xs font-mono bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-gray-600">
+                    {envio.total_codigos} c\u00f3digos
                   </span>
-                  <span className="text-xs font-mono bg-crunch-panel-2 border border-crunch-line-2 px-2 py-0.5 rounded text-crunch-ink-dim">
+                  <span className="text-xs font-mono bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-gray-600">
                     {envio.total_itens} unidades
                   </span>
                 </div>
                 <button
                   onClick={() => handleVisualizar(envio)}
-                  className="px-4 py-1.5 text-xs font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:text-crunch-accent hover:border-crunch-accent transition-colors"
+                  className="px-4 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:text-[#ff6a00] hover:border-[#ff6a00] transition-colors"
                 >
                   Visualizar
                 </button>
               </div>
 
               {viewEnvio?.id === envio.id && (
-                <div className="mt-4 pt-4 border-t border-crunch-line/50">
+                <div className="mt-4 pt-4 border-t border-gray-100">
                   {viewLoading ? (
-                    <p className="text-xs text-crunch-ink-mute">Carregando itens...</p>
+                    <p className="text-xs text-gray-400">Carregando itens...</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="text-[10px] uppercase tracking-wider text-crunch-ink-mute border-b border-crunch-line/50">
+                          <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-100">
                             <th className="text-left px-3 py-2 font-semibold">Produto</th>
                             <th className="text-left px-3 py-2 font-semibold">Fornecedor</th>
-                            <th className="text-left px-3 py-2 font-semibold">Código ML</th>
+                            <th className="text-left px-3 py-2 font-semibold">C\u00f3digo ML</th>
                             <th className="text-center px-3 py-2 font-semibold">Qtd</th>
                           </tr>
                         </thead>
                         <tbody>
                           {viewItens.map((item) => (
-                            <tr key={item.id} className="border-b border-crunch-line/30">
-                              <td className="px-3 py-2 text-crunch-ink-dim max-w-[200px] truncate">{item.descricao || '—'}</td>
-                              <td className="px-3 py-2 text-crunch-ink-mute">{item.fornecedor || '—'}</td>
+                            <tr key={item.id} className="border-b border-gray-50">
+                              <td className="px-3 py-2 text-gray-600 max-w-[200px] truncate">{item.descricao || '\u2014'}</td>
+                              <td className="px-3 py-2 text-gray-400">{item.fornecedor || '\u2014'}</td>
                               <td className="px-3 py-2">
-                                <span className="font-mono text-crunch-accent">{item.codigo_ml}</span>
+                                <span className="font-mono text-[#ff6a00]">{item.codigo_ml}</span>
                               </td>
-                              <td className="px-3 py-2 text-center font-medium">{item.quantidade}</td>
+                              <td className="px-3 py-2 text-center font-medium text-gray-900">{item.quantidade}</td>
                             </tr>
                           ))}
                         </tbody>
