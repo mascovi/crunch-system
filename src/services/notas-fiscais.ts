@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { NotaFiscal, ItemNF, XMLParsedNF, NotaEmTransito } from '@/types'
 import { calcularDiasUteis } from '@/lib/business-days'
-import { resolverFornecedor } from './fornecedores'
+import { resolverFornecedor, resolverCodigoFornecedor } from './fornecedores'
 
 /**
  * Busca todas as NFs em transito.
@@ -51,6 +51,7 @@ export async function verificarNFDuplicada(numero_nf: string, cnpj: string): Pro
 /**
  * Salva uma NF e seus itens no banco (apos upload XML).
  * NAO atualiza estoque - so entra no painel de transito.
+ * Resolve codigos de fornecedor para codigos ML automaticamente.
  */
 export async function salvarNotaFiscal(
   parsedNF: XMLParsedNF,
@@ -58,6 +59,19 @@ export async function salvarNotaFiscal(
 ): Promise<NotaFiscal> {
   // Resolver nome fantasia do fornecedor (auto-cadastra se novo)
   const nomeFantasia = await resolverFornecedor(parsedNF.fornecedor)
+
+  // Resolver codigos: verificar se algum codigo do XML eh codigo_fornecedor
+  const itensResolvidos = await Promise.all(
+    parsedNF.itens.map(async (item) => {
+      const { codigo_ml, produto_existente } = await resolverCodigoFornecedor(item.codigo_ml)
+      return {
+        ...item,
+        codigo_ml_original: item.codigo_ml, // guardar o codigo original do XML
+        codigo_ml,                           // codigo ML real (resolvido)
+        produto_existente,
+      }
+    })
+  )
 
   // Inserir NF
   const { data: nf, error: nfError } = await supabase
@@ -78,8 +92,8 @@ export async function salvarNotaFiscal(
 
   if (nfError) throw new Error(`Erro ao salvar NF: ${nfError.message}`)
 
-  // Inserir itens
-  const itensParaInserir = parsedNF.itens.map((item) => ({
+  // Inserir itens (com codigo_ml resolvido)
+  const itensParaInserir = itensResolvidos.map((item) => ({
     nf_id: nf.id,
     codigo_ml: item.codigo_ml,
     produto: item.produto,
@@ -95,21 +109,27 @@ export async function salvarNotaFiscal(
   if (itensError) throw new Error(`NF salva mas erro nos itens: ${itensError.message}`)
 
   // Auto-cadastrar produtos novos na tabela produtos
-  for (const item of parsedNF.itens) {
-    const { data: existente } = await supabase
-      .from('produtos')
-      .select('codigo_ml')
-      .eq('codigo_ml', item.codigo_ml)
-      .limit(1)
-
-    if (!existente || existente.length === 0) {
-      await supabase
+  for (const item of itensResolvidos) {
+    if (!item.produto_existente) {
+      // Produto novo - cadastrar com codigo_fornecedor = codigo original do XML
+      const { data: existente } = await supabase
         .from('produtos')
-        .insert({
-          codigo_ml: item.codigo_ml,
-          descricao: item.produto,
-          fornecedor: nomeFantasia,
-        })
+        .select('codigo_ml')
+        .eq('codigo_ml', item.codigo_ml)
+        .limit(1)
+
+      if (!existente || existente.length === 0) {
+        await supabase
+          .from('produtos')
+          .insert({
+            codigo_ml: item.codigo_ml,
+            descricao: item.produto,
+            fornecedor: nomeFantasia,
+            codigo_fornecedor: item.codigo_ml_original !== item.codigo_ml
+              ? item.codigo_ml_original
+              : null,
+          })
+      }
     }
   }
 

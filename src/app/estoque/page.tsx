@@ -102,6 +102,7 @@ function TabEstoque() {
   const [novoCodigoMl, setNovoCodigoMl] = useState('')
   const [novoDescricao, setNovoDescricao] = useState('')
   const [novoFornecedor, setNovoFornecedor] = useState('')
+  const [novoCodigoFornecedor, setNovoCodigoFornecedor] = useState('')
   const [novoQtdInicial, setNovoQtdInicial] = useState('')
   const [novoProdLoading, setNovoProdLoading] = useState(false)
   const [novoProdError, setNovoProdError] = useState('')
@@ -270,6 +271,7 @@ function TabEstoque() {
     setNovoCodigoMl('')
     setNovoDescricao('')
     setNovoFornecedor('')
+    setNovoCodigoFornecedor('')
     setNovoQtdInicial('')
     setNovoProdError('')
     setNovoProdSuccess('')
@@ -288,6 +290,7 @@ function TabEstoque() {
         codigo_ml: novoCodigoMl.trim().toUpperCase(),
         descricao: novoDescricao.trim(),
         fornecedor: novoFornecedor.trim(),
+        codigo_fornecedor: novoCodigoFornecedor.trim() || undefined,
       })
       const qtdIni = parseInt(novoQtdInicial, 10)
       if (!isNaN(qtdIni) && qtdIni > 0) {
@@ -739,6 +742,16 @@ function TabEstoque() {
                   onChange={(e) => setNovoFornecedor(e.target.value)}
                   placeholder="Ex: Vitafor"
                   className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Código Fornecedor (opcional)</label>
+                <input
+                  type="text"
+                  value={novoCodigoFornecedor}
+                  onChange={(e) => setNovoCodigoFornecedor(e.target.value)}
+                  placeholder="Ex: IMT120 (código interno do fornecedor)"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
                 />
               </div>
               <div>

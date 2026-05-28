@@ -181,6 +181,7 @@ export async function cadastrarProduto(produto: Produto): Promise<void> {
       codigo_ml: produto.codigo_ml,
       descricao: produto.descricao,
       fornecedor: produto.fornecedor,
+      codigo_fornecedor: produto.codigo_fornecedor || null,
     })
 
   if (error) throw new Error(`Erro ao cadastrar produto: ${error.message}`)

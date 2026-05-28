@@ -73,6 +73,7 @@ export interface Produto {
   codigo_ml: string
   descricao: string
   fornecedor: string
+  codigo_fornecedor?: string
 }
 
 export type MotivoAjuste =
