@@ -888,6 +888,9 @@ function TabEstoque() {
                           {mov.ref_label && (
                             <p className="text-xs text-gray-500 mt-0.5">{mov.ref_label}</p>
                           )}
+                          {mov.observacao && (
+                            <p className="text-xs text-gray-400 mt-0.5 italic">{`"${mov.observacao}"`}</p>
+                          )}
                           {mov.preco_compra && mov.preco_compra > 0 && (
                             <p className="text-xs text-gray-400 mt-0.5">
                               Preço compra: {mov.preco_compra.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}

@@ -155,6 +155,7 @@ export async function ajustarEstoque(params: {
       referencia_id: crypto.randomUUID(),
       data: new Date().toISOString(),
       preco_compra: 0,
+      observacao: params.observacao || null,
     })
 
   if (error) throw new Error(`Erro ao ajustar estoque: ${error.message}`)

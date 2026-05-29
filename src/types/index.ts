@@ -36,6 +36,7 @@ export interface EstoqueMovimentacao {
   referencia_id: string
   data: string
   preco_compra?: number
+  observacao?: string
 }
 
 export interface SaldoEstoque {
