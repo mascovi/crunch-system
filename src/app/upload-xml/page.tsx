@@ -382,7 +382,7 @@ export default function UploadXMLPage() {
                     <th className="text-left px-4 py-3 font-semibold">Fornecedor</th>
                     <th className="text-left px-4 py-3 font-semibold">Faturamento</th>
                     <th className="text-left px-4 py-3 font-semibold">Transportadora</th>
-                    <th className="text-left px-4 py-3 font-semibold">Entrada no Sistema</th>
+                    <th className="text-left px-4 py-3 font-semibold">Entregue</th>
                     <th className="text-center px-4 py-3 font-semibold">Status</th>
                   </tr>
                 </thead>
