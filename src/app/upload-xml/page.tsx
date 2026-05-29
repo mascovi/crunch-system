@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { parseNFeXML, validarCodigosML } from '@/lib/xml-parser'
 import { verificarNFDuplicada, salvarNotaFiscal } from '@/services/notas-fiscais'
 import { supabase } from '@/lib/supabase'
-import type { XMLParsedNF } from '@/types'
+import type { XMLParsedNF, NotaFiscal } from '@/types'
 
 type Step = 'upload' | 'preview' | 'success'
 
@@ -19,6 +19,38 @@ export default function UploadXMLPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Histórico de NFs
+  const [historicoNFs, setHistoricoNFs] = useState<NotaFiscal[]>([])
+  const [historicoLoading, setHistoricoLoading] = useState(true)
+
+  useEffect(() => {
+    const carregarHistorico = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('notas_fiscais')
+          .select('*')
+          .order('data_upload', { ascending: false })
+          .limit(50)
+        if (!error && data) setHistoricoNFs(data)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setHistoricoLoading(false)
+      }
+    }
+    carregarHistorico()
+  }, [])
+
+  // Reload history after success
+  const recarregarHistorico = async () => {
+    const { data } = await supabase
+      .from('notas_fiscais')
+      .select('*')
+      .order('data_upload', { ascending: false })
+      .limit(50)
+    if (data) setHistoricoNFs(data)
+  }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -98,6 +130,7 @@ export default function UploadXMLPage() {
       await salvarNotaFiscal(parsedNF, xmlUrl)
 
       setStep('success')
+      recarregarHistorico()
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Erro ao salvar nota fiscal.'])
     } finally {
@@ -310,6 +343,71 @@ export default function UploadXMLPage() {
           </div>
         </div>
       )}
+
+      {/* ============================================ */}
+      {/* HISTÓRICO DE NFs SUBIDAS                     */}
+      {/* ============================================ */}
+      <div className="mt-12">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Histórico de Notas Fiscais</h2>
+        
+        {historicoLoading ? (
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+            <svg className="animate-spin h-5 w-5 mx-auto text-gray-400" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        ) : historicoNFs.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 text-sm">
+            Nenhuma nota fiscal enviada ainda.
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+                    <th className="text-left px-6 py-3 font-semibold">NF</th>
+                    <th className="text-left px-4 py-3 font-semibold">Fornecedor</th>
+                    <th className="text-center px-4 py-3 font-semibold">Faturamento</th>
+                    <th className="text-left px-4 py-3 font-semibold">Transportadora</th>
+                    <th className="text-center px-4 py-3 font-semibold">Entrada no Sistema</th>
+                    <th className="text-center px-4 py-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historicoNFs.map((nf) => (
+                    <tr key={nf.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-3">
+                        <span className="font-mono text-xs bg-orange-50 text-[#ff6a00] border border-orange-200 px-2 py-0.5 rounded font-medium">
+                          {nf.numero_nf}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 text-xs font-medium">{nf.fornecedor}</td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-500">
+                        {nf.data_emissao ? new Date(nf.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{nf.transportadora || '—'}</td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-500">
+                        {nf.data_upload ? new Date(nf.data_upload).toLocaleDateString('pt-BR') : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          nf.status === 'ENTREGUE'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {nf.status === 'ENTREGUE' ? 'Entregue' : 'Em Trânsito'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
