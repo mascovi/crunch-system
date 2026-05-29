@@ -348,54 +348,61 @@ export default function UploadXMLPage() {
       {/* HISTÓRICO DE NFs SUBIDAS                     */}
       {/* ============================================ */}
       <div className="mt-12">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Histórico de Notas Fiscais</h2>
-        
+        <div className="text-xs font-semibold uppercase tracking-widest text-crunch-ink-dim mb-5">
+          Histórico de Notas Fiscais
+        </div>
+
         {historicoLoading ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-            <svg className="animate-spin h-5 w-5 mx-auto text-gray-400" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+          <div className="bg-crunch-panel border border-crunch-line rounded-2xl p-8">
+            <div className="text-center text-crunch-ink-mute">Carregando histórico...</div>
           </div>
         ) : historicoNFs.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 text-sm">
+          <div className="bg-crunch-panel border border-crunch-line rounded-2xl p-8 text-center text-crunch-ink-mute text-sm">
             Nenhuma nota fiscal enviada ainda.
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-crunch-panel border border-crunch-line rounded-2xl overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-crunch-line flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-crunch-ink-dim">
+                  Notas Fiscais Recebidas
+                </h3>
+              </div>
+              <span className="text-xs font-mono bg-crunch-panel-2 border border-crunch-line-2 px-3 py-1 rounded-full text-crunch-accent">
+                {historicoNFs.length}
+              </span>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+                  <tr className="text-[10px] uppercase tracking-wider text-crunch-ink-mute border-b border-crunch-line">
                     <th className="text-left px-6 py-3 font-semibold">NF</th>
                     <th className="text-left px-4 py-3 font-semibold">Fornecedor</th>
-                    <th className="text-center px-4 py-3 font-semibold">Faturamento</th>
+                    <th className="text-left px-4 py-3 font-semibold">Faturamento</th>
                     <th className="text-left px-4 py-3 font-semibold">Transportadora</th>
-                    <th className="text-center px-4 py-3 font-semibold">Entrada no Sistema</th>
+                    <th className="text-left px-4 py-3 font-semibold">Entrada no Sistema</th>
                     <th className="text-center px-4 py-3 font-semibold">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {historicoNFs.map((nf) => (
-                    <tr key={nf.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-3">
-                        <span className="font-mono text-xs bg-orange-50 text-[#ff6a00] border border-orange-200 px-2 py-0.5 rounded font-medium">
-                          {nf.numero_nf}
-                        </span>
+                    <tr key={nf.id} className="border-b border-crunch-line/50 hover:bg-crunch-panel-2/50 transition-colors">
+                      <td className="px-6 py-4 font-mono text-crunch-ink-dim">{nf.numero_nf}</td>
+                      <td className="px-4 py-4 font-medium">{nf.fornecedor}</td>
+                      <td className="px-4 py-4 text-crunch-ink-dim">
+                        {nf.data_emissao ? new Date(nf.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR') : '\u2014'}
                       </td>
-                      <td className="px-4 py-3 text-gray-700 text-xs font-medium">{nf.fornecedor}</td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500">
-                        {nf.data_emissao ? new Date(nf.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                      <td className="px-4 py-4 text-crunch-ink-dim text-xs">{nf.transportadora || '\u2014'}</td>
+                      <td className="px-4 py-4 text-crunch-ink-dim">
+                        {nf.data_upload ? new Date(nf.data_upload).toLocaleDateString('pt-BR') : '\u2014'}
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{nf.transportadora || '—'}</td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500">
-                        {nf.data_upload ? new Date(nf.data_upload).toLocaleDateString('pt-BR') : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-4 text-center">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                           nf.status === 'ENTREGUE'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-amber-100 text-amber-700'
+                            ? 'bg-green-900/30 text-green-400'
+                            : 'bg-yellow-900/30 text-yellow-400'
                         }`}>
                           {nf.status === 'ENTREGUE' ? 'Entregue' : 'Em Trânsito'}
                         </span>
