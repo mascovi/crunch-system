@@ -396,7 +396,7 @@ export default function UploadXMLPage() {
                       </td>
                       <td className="px-4 py-4 text-crunch-ink-dim text-xs">{nf.transportadora || '\u2014'}</td>
                       <td className="px-4 py-4 text-crunch-ink-dim">
-                        {nf.data_upload ? new Date(nf.data_upload).toLocaleDateString('pt-BR') : '\u2014'}
+                        {nf.data_recebimento ? new Date(nf.data_recebimento).toLocaleDateString('pt-BR') : '\u2014'}
                       </td>
                       <td className="px-4 py-4 text-center">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
