@@ -2,8 +2,10 @@
 
 import Link from 'next/link'
 import NotasEmTransito from '@/components/NotasEmTransito'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function HubPage() {
+  const { usuario, logout } = useAuth()
   return (
     <div className="max-w-[1080px] mx-auto px-8 py-20">
       {/* ============================================ */}
@@ -25,9 +27,17 @@ export default function HubPage() {
             </p>
           </div>
         </div>
-        <div className="text-right text-xs text-crunch-ink-mute leading-relaxed">
-          <div>Sistema: <b className="text-crunch-ink-dim font-medium">v1.0</b></div>
-          <div>Modo: <b className="text-crunch-ink-dim font-medium">Operacional</b></div>
+        <div className="flex items-center gap-6">
+          <div className="text-right text-xs text-crunch-ink-mute leading-relaxed">
+            <div>Operador: <b className="text-crunch-ink-dim font-medium">{usuario?.nome}</b></div>
+            <div>Sistema: <b className="text-crunch-ink-dim font-medium">v1.0</b></div>
+          </div>
+          <button
+            onClick={logout}
+            className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border border-crunch-line rounded-lg text-crunch-ink-mute hover:text-red-400 hover:border-red-400/50 transition-colors"
+          >
+            Sair
+          </button>
         </div>
       </header>
 
