@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
-import { listarEstoque, ajustarEstoque, cadastrarProduto, buscarHistoricoCodigo } from '@/services/estoque'
+import { listarEstoque, ajustarEstoque, cadastrarProduto, buscarHistoricoCodigo, atualizarProduto } from '@/services/estoque'
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
 import { supabase } from '@/lib/supabase'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao } from '@/types'
@@ -102,6 +102,13 @@ function TabEstoque() {
   const [ajusteLoading, setAjusteLoading] = useState(false)
   const [ajusteError, setAjusteError] = useState('')
   const [ajusteSuccess, setAjusteSuccess] = useState('')
+
+  // Campos de edição de cadastro no modal de ajuste
+  const [editDescricao, setEditDescricao] = useState('')
+  const [editFornecedor, setEditFornecedor] = useState('')
+  const [editCodigoFornecedor, setEditCodigoFornecedor] = useState('')
+  const [editCodigoMl, setEditCodigoMl] = useState('')
+  const [editCadastroOpen, setEditCadastroOpen] = useState(false)
 
   // Modal Novo Produto
   const [novoProdOpen, setNovoProdOpen] = useState(false)
@@ -244,35 +251,77 @@ function TabEstoque() {
     setAjusteObs('')
     setAjusteError('')
     setAjusteSuccess('')
+    // Preencher campos de edição com dados atuais
+    setEditDescricao(item.produto)
+    setEditFornecedor(item.fornecedor_principal || '')
+    setEditCodigoFornecedor('')
+    setEditCodigoMl(item.codigo_ml)
+    setEditCadastroOpen(false)
+    // Buscar SKU atual do produto
+    supabase.from('produtos').select('codigo_fornecedor').eq('codigo_ml', item.codigo_ml).limit(1)
+      .then(({ data }) => {
+        if (data && data[0]) setEditCodigoFornecedor(data[0].codigo_fornecedor || '')
+      })
     setAjusteOpen(true)
   }
 
   const handleAjuste = async () => {
     if (!ajusteItem) return
+
+    // Verificar se tem ajuste de quantidade OU edição de cadastro
     const qtd = parseInt(ajusteQtd, 10)
-    if (isNaN(qtd) || qtd <= 0) {
-      setAjusteError('Informe uma quantidade válida maior que zero.')
+    const temAjusteQtd = !isNaN(qtd) && qtd > 0
+    const temEdicao = editCadastroOpen && (
+      editDescricao !== ajusteItem.produto ||
+      editFornecedor !== (ajusteItem.fornecedor_principal || '') ||
+      editCodigoMl !== ajusteItem.codigo_ml ||
+      editCodigoFornecedor !== ''
+    )
+
+    if (!temAjusteQtd && !temEdicao) {
+      setAjusteError('Informe uma quantidade para ajustar ou altere algum campo do cadastro.')
       return
     }
+
     setAjusteLoading(true)
     setAjusteError('')
     try {
-      const quantidade = ajusteTipo === 'saida' ? -qtd : qtd
-      await ajustarEstoque({
-        codigo_ml: ajusteItem.codigo_ml,
-        produto: ajusteItem.produto,
-        quantidade,
-        motivo: ajusteMotivo,
-        observacao: ajusteObs,
-      })
-      setAjusteSuccess(`Estoque de ${ajusteItem.codigo_ml} ajustado com sucesso.`)
+      // Salvar edições de cadastro se houver
+      if (temEdicao) {
+        await atualizarProduto({
+          codigo_ml_atual: ajusteItem.codigo_ml,
+          codigo_ml_novo: editCodigoMl.trim().toUpperCase() || undefined,
+          descricao: editDescricao.trim() || undefined,
+          fornecedor: editFornecedor.trim() || undefined,
+          codigo_fornecedor: editCodigoFornecedor.trim(),
+        })
+      }
+
+      // Ajustar quantidade se informada
+      if (temAjusteQtd) {
+        const quantidade = ajusteTipo === 'saida' ? -qtd : qtd
+        const codRef = editCodigoMl.trim().toUpperCase() || ajusteItem.codigo_ml
+        await ajustarEstoque({
+          codigo_ml: codRef,
+          produto: editDescricao.trim() || ajusteItem.produto,
+          quantidade,
+          motivo: ajusteMotivo,
+          observacao: ajusteObs,
+        })
+      }
+
+      setAjusteSuccess(temEdicao && temAjusteQtd
+        ? 'Cadastro atualizado e estoque ajustado!'
+        : temEdicao
+        ? 'Cadastro atualizado com sucesso!'
+        : `Estoque de ${ajusteItem.codigo_ml} ajustado com sucesso.`)
       await carregarEstoque()
       setTimeout(() => {
         setAjusteOpen(false)
         setAjusteSuccess('')
       }, 1200)
     } catch (err) {
-      setAjusteError(err instanceof Error ? err.message : 'Erro ao ajustar estoque.')
+      setAjusteError(err instanceof Error ? err.message : 'Erro ao salvar.')
     } finally {
       setAjusteLoading(false)
     }
@@ -713,6 +762,62 @@ function TabEstoque() {
             )}
 
             <div className="space-y-4">
+              {/* Editar Cadastro (colapsável) */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setEditCadastroOpen(!editCadastroOpen)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Editar Cadastro do Produto
+                  </span>
+                  <span className="text-xs text-gray-400">{editCadastroOpen ? '▲' : '▼'}</span>
+                </button>
+                {editCadastroOpen && (
+                  <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold block mb-1">Código ML</label>
+                      <input
+                        type="text"
+                        value={editCodigoMl}
+                        onChange={(e) => setEditCodigoMl(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold block mb-1">Descrição</label>
+                      <input
+                        type="text"
+                        value={editDescricao}
+                        onChange={(e) => setEditDescricao(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold block mb-1">Fornecedor</label>
+                      <input
+                        type="text"
+                        value={editFornecedor}
+                        onChange={(e) => setEditFornecedor(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold block mb-1">SKU Fornecedor</label>
+                      <input
+                        type="text"
+                        value={editCodigoFornecedor}
+                        onChange={(e) => setEditCodigoFornecedor(e.target.value)}
+                        placeholder="Código do fornecedor"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Tipo */}
               <div className="flex gap-2">
                 <button
@@ -796,7 +901,7 @@ function TabEstoque() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                 )}
-                Confirmar Ajuste
+                {editCadastroOpen ? 'Salvar Alterações' : 'Confirmar Ajuste'}
               </button>
             </div>
           </div>

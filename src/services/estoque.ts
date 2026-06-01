@@ -200,3 +200,55 @@ export async function listarProdutos(): Promise<Produto[]> {
   if (error) throw new Error(`Erro ao listar produtos: ${error.message}`)
   return data || []
 }
+
+/**
+ * Atualizar cadastro de um produto existente.
+ * Atualiza na tabela produtos e também nas movimentações existentes.
+ */
+export async function atualizarProduto(params: {
+  codigo_ml_atual: string
+  codigo_ml_novo?: string
+  descricao?: string
+  fornecedor?: string
+  codigo_fornecedor?: string
+}): Promise<void> {
+  // Atualizar tabela produtos
+  const updates: Record<string, string | null> = {}
+  if (params.descricao !== undefined) updates.descricao = params.descricao
+  if (params.fornecedor !== undefined) updates.fornecedor = params.fornecedor
+  if (params.codigo_fornecedor !== undefined) updates.codigo_fornecedor = params.codigo_fornecedor || null
+
+  if (params.codigo_ml_novo && params.codigo_ml_novo !== params.codigo_ml_atual) {
+    updates.codigo_ml = params.codigo_ml_novo
+  }
+
+  if (Object.keys(updates).length > 0) {
+    const { error } = await supabase
+      .from('produtos')
+      .update(updates)
+      .eq('codigo_ml', params.codigo_ml_atual)
+
+    if (error) throw new Error(`Erro ao atualizar produto: ${error.message}`)
+  }
+
+  // Se mudou o código ML, atualizar nas movimentações também
+  if (params.codigo_ml_novo && params.codigo_ml_novo !== params.codigo_ml_atual) {
+    const { error: errMov } = await supabase
+      .from('estoque_movimentacoes')
+      .update({ codigo_ml: params.codigo_ml_novo })
+      .eq('codigo_ml', params.codigo_ml_atual)
+
+    if (errMov) throw new Error(`Erro ao atualizar movimentações: ${errMov.message}`)
+  }
+
+  // Se mudou a descrição, atualizar nas movimentações
+  if (params.descricao) {
+    const codRef = params.codigo_ml_novo || params.codigo_ml_atual
+    const { error: errMov } = await supabase
+      .from('estoque_movimentacoes')
+      .update({ produto: params.descricao })
+      .eq('codigo_ml', codRef)
+
+    if (errMov) throw new Error(`Erro ao atualizar descrição nas movimentações: ${errMov.message}`)
+  }
+}
