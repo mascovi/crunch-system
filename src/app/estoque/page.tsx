@@ -909,12 +909,19 @@ function TabEstoque() {
 
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Fornecedor</label>
-                <input
-                  type="text"
+                <select
                   value={editFornecedor}
                   onChange={(e) => setEditFornecedor(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
-                />
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00] appearance-none"
+                >
+                  <option value="">Selecione...</option>
+                  {fornecedores.map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                  {editFornecedor && !fornecedores.includes(editFornecedor) && (
+                    <option value={editFornecedor}>{editFornecedor}</option>
+                  )}
+                </select>
               </div>
 
               <div>

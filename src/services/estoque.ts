@@ -212,7 +212,16 @@ export async function atualizarProduto(params: {
   fornecedor?: string
   codigo_fornecedor?: string
 }): Promise<void> {
-  // Atualizar tabela produtos
+  // Verificar se produto existe na tabela produtos
+  const { data: existente } = await supabase
+    .from('produtos')
+    .select('codigo_ml')
+    .eq('codigo_ml', params.codigo_ml_atual)
+    .limit(1)
+
+  const produtoExiste = existente && existente.length > 0
+
+  // Montar dados para update/insert
   const updates: Record<string, string | null> = {}
   if (params.descricao !== undefined) updates.descricao = params.descricao
   if (params.fornecedor !== undefined) updates.fornecedor = params.fornecedor
@@ -222,13 +231,28 @@ export async function atualizarProduto(params: {
     updates.codigo_ml = params.codigo_ml_novo
   }
 
-  if (Object.keys(updates).length > 0) {
+  if (produtoExiste) {
+    // Update normal
+    if (Object.keys(updates).length > 0) {
+      const { error } = await supabase
+        .from('produtos')
+        .update(updates)
+        .eq('codigo_ml', params.codigo_ml_atual)
+
+      if (error) throw new Error(`Erro ao atualizar produto: ${error.message}`)
+    }
+  } else {
+    // Produto não existe na tabela produtos — criar
     const { error } = await supabase
       .from('produtos')
-      .update(updates)
-      .eq('codigo_ml', params.codigo_ml_atual)
+      .insert({
+        codigo_ml: params.codigo_ml_novo || params.codigo_ml_atual,
+        descricao: params.descricao || '',
+        fornecedor: params.fornecedor || '',
+        codigo_fornecedor: params.codigo_fornecedor || null,
+      })
 
-    if (error) throw new Error(`Erro ao atualizar produto: ${error.message}`)
+    if (error) throw new Error(`Erro ao cadastrar produto: ${error.message}`)
   }
 
   // Se mudou o código ML, atualizar nas movimentações também
