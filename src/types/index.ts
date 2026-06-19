@@ -77,6 +77,18 @@ export interface Produto {
   codigo_fornecedor?: string
 }
 
+export interface Fornecedor {
+  id: string
+  razao_social: string
+  nome_fantasia: string
+  cnpj: string
+  endereco: string
+  telefone: string
+  email: string
+  observacoes: string
+  created_at: string
+}
+
 export type MotivoAjuste =
   | 'DEVOLUCAO'
   | 'CONSUMO_PROPRIO'

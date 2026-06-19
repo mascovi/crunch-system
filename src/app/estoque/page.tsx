@@ -6,7 +6,8 @@ import Papa from 'papaparse'
 import { listarEstoque, ajustarEstoque, cadastrarProduto, buscarHistoricoCodigo, atualizarProduto } from '@/services/estoque'
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
 import { supabase } from '@/lib/supabase'
-import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao } from '@/types'
+import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao, Fornecedor } from '@/types'
+import { listarFornecedoresCompleto, atualizarFornecedor, buscarNFsPorFornecedor } from '@/services/fornecedores'
 
 // Tipo enriquecido com dados de referência
 interface MovimentacaoEnriquecida extends EstoqueMovimentacao {
@@ -134,6 +135,21 @@ function TabEstoque() {
   // Sort
   const [sortCol, setSortCol] = useState<'produto' | 'quantidade' | 'fornecedor' | 'preco'>('produto')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  // Modal Gerenciar Fornecedores
+  const [fornecedorModalOpen, setFornecedorModalOpen] = useState(false)
+  const [fornecedoresList, setFornecedoresList] = useState<Fornecedor[]>([])
+  const [fornecedoresLoading, setFornecedoresLoading] = useState(false)
+  const [fornecedorEdit, setFornecedorEdit] = useState<Fornecedor | null>(null)
+  const [fornecedorForm, setFornecedorForm] = useState({
+    razao_social: '', nome_fantasia: '', cnpj: '', endereco: '', telefone: '', email: '', observacoes: ''
+  })
+  const [fornecedorSaving, setFornecedorSaving] = useState(false)
+  const [fornecedorError, setFornecedorError] = useState('')
+  const [fornecedorSuccess, setFornecedorSuccess] = useState('')
+  const [fornecedorNFs, setFornecedorNFs] = useState<{id:string;numero_nf:string;data_emissao:string;data_recebimento?:string|null;status:string;volumes:number;fornecedor:string;cnpj:string}[]>([])
+  const [fornecedorNFsLoading, setFornecedorNFsLoading] = useState(false)
+  const [fornecedorView, setFornecedorView] = useState<'list' | 'edit' | 'nfs'>('list')
 
   const carregarEstoque = useCallback(async () => {
     setLoading(true)
@@ -628,6 +644,22 @@ function TabEstoque() {
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
             Novo Produto
+          </button>
+          {/* Botão Gerenciar Fornecedores */}
+          <button
+            onClick={() => {
+              setFornecedorModalOpen(true)
+              setFornecedorView('list')
+              setFornecedoresLoading(true)
+              listarFornecedoresCompleto().then(data => {
+                setFornecedoresList(data)
+                setFornecedoresLoading(false)
+              }).catch(() => setFornecedoresLoading(false))
+            }}
+            className="px-4 py-2.5 text-sm font-semibold rounded-lg bg-white border border-gray-200 text-gray-700 hover:border-[#ff6a00] hover:text-[#ff6a00] transition-colors whitespace-nowrap shadow-sm flex items-center gap-2"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 4a2 2 0 100-4 2 2 0 000 4zM1 12c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            Fornecedores
           </button>
           {/* Counter */}
           <span className="text-xs text-gray-400 font-medium ml-auto">
@@ -1187,6 +1219,300 @@ function TabEstoque() {
           </div>
         </div>
       )}
+    
+      {/* ========== MODAL GERENCIAR FORNECEDORES ========== */}
+      {fornecedorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {fornecedorView !== 'list' && (
+                  <button
+                    onClick={() => {
+                      setFornecedorView('list')
+                      setFornecedorEdit(null)
+                      setFornecedorError('')
+                      setFornecedorSuccess('')
+                    }}
+                    className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#ff6a00] hover:border-[#ff6a00] transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                )}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    {fornecedorView === 'list' && 'Gerenciar Fornecedores'}
+                    {fornecedorView === 'edit' && `Editar: ${fornecedorEdit?.nome_fantasia || ''}`}
+                    {fornecedorView === 'nfs' && `NFs: ${fornecedorEdit?.nome_fantasia || ''}`}
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    {fornecedorView === 'list' && `${fornecedoresList.length} fornecedor(es) cadastrado(s)`}
+                    {fornecedorView === 'edit' && 'Edite os dados do fornecedor'}
+                    {fornecedorView === 'nfs' && `${fornecedorNFs.length} nota(s) fiscal(is)`}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setFornecedorModalOpen(false)
+                  setFornecedorEdit(null)
+                  setFornecedorView('list')
+                  setFornecedorError('')
+                  setFornecedorSuccess('')
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M15 5L5 15M5 5l10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* === LIST VIEW === */}
+              {fornecedorView === 'list' && (
+                <>
+                  {fornecedoresLoading ? (
+                    <div className="text-center py-12 text-gray-400 text-sm">Carregando fornecedores...</div>
+                  ) : fornecedoresList.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 text-sm">Nenhum fornecedor cadastrado.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {fornecedoresList.map((f) => (
+                        <div key={f.id} className="border border-gray-200 rounded-xl p-4 hover:border-[#ff6a00]/30 transition-colors">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-bold text-gray-900 text-sm">{f.nome_fantasia}</span>
+                                {f.cnpj && (
+                                  <span className="text-[10px] font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{f.cnpj}</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-400">{f.razao_social}</p>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                                {f.telefone && <span>Tel: {f.telefone}</span>}
+                                {f.email && <span>Email: {f.email}</span>}
+                                {f.endereco && <span>End: {f.endereco.length > 40 ? f.endereco.substring(0, 40) + '...' : f.endereco}</span>}
+                              </div>
+                            </div>
+                            <div className="flex gap-2 ml-4 shrink-0">
+                              <button
+                                onClick={() => {
+                                  setFornecedorEdit(f)
+                                  setFornecedorForm({
+                                    razao_social: f.razao_social || '',
+                                    nome_fantasia: f.nome_fantasia || '',
+                                    cnpj: f.cnpj || '',
+                                    endereco: f.endereco || '',
+                                    telefone: f.telefone || '',
+                                    email: f.email || '',
+                                    observacoes: f.observacoes || '',
+                                  })
+                                  setFornecedorError('')
+                                  setFornecedorSuccess('')
+                                  setFornecedorView('edit')
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:border-[#ff6a00] hover:text-[#ff6a00] transition-colors"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setFornecedorEdit(f)
+                                  setFornecedorNFsLoading(true)
+                                  setFornecedorView('nfs')
+                                  try {
+                                    const nfs = await buscarNFsPorFornecedor(f.nome_fantasia)
+                                    setFornecedorNFs(nfs)
+                                  } catch {
+                                    setFornecedorNFs([])
+                                  } finally {
+                                    setFornecedorNFsLoading(false)
+                                  }
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                              >
+                                Ver NFs
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* === EDIT VIEW === */}
+              {fornecedorView === 'edit' && fornecedorEdit && (
+                <div className="space-y-4">
+                  {fornecedorError && (
+                    <div className="bg-red-50 text-red-700 text-sm px-4 py-2.5 rounded-lg border border-red-200">{fornecedorError}</div>
+                  )}
+                  {fornecedorSuccess && (
+                    <div className="bg-green-50 text-green-700 text-sm px-4 py-2.5 rounded-lg border border-green-200">{fornecedorSuccess}</div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Razão Social *</label>
+                      <input
+                        type="text"
+                        value={fornecedorForm.razao_social}
+                        onChange={(e) => setFornecedorForm(prev => ({...prev, razao_social: e.target.value}))}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nome Fantasia *</label>
+                      <input
+                        type="text"
+                        value={fornecedorForm.nome_fantasia}
+                        onChange={(e) => setFornecedorForm(prev => ({...prev, nome_fantasia: e.target.value}))}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">CNPJ *</label>
+                      <input
+                        type="text"
+                        value={fornecedorForm.cnpj}
+                        onChange={(e) => setFornecedorForm(prev => ({...prev, cnpj: e.target.value}))}
+                        placeholder="00.000.000/0000-00"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Telefone *</label>
+                      <input
+                        type="text"
+                        value={fornecedorForm.telefone}
+                        onChange={(e) => setFornecedorForm(prev => ({...prev, telefone: e.target.value}))}
+                        placeholder="(00) 00000-0000"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email *</label>
+                      <input
+                        type="email"
+                        value={fornecedorForm.email}
+                        onChange={(e) => setFornecedorForm(prev => ({...prev, email: e.target.value}))}
+                        placeholder="contato@fornecedor.com"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Endereço *</label>
+                      <input
+                        type="text"
+                        value={fornecedorForm.endereco}
+                        onChange={(e) => setFornecedorForm(prev => ({...prev, endereco: e.target.value}))}
+                        placeholder="Rua, nº, bairro, cidade - UF"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Observações</label>
+                      <textarea
+                        value={fornecedorForm.observacoes}
+                        onChange={(e) => setFornecedorForm(prev => ({...prev, observacoes: e.target.value}))}
+                        rows={3}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00] resize-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setFornecedorView('list')
+                        setFornecedorEdit(null)
+                        setFornecedorError('')
+                        setFornecedorSuccess('')
+                      }}
+                      className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!fornecedorEdit) return
+                        if (!fornecedorForm.razao_social.trim() || !fornecedorForm.nome_fantasia.trim() || !fornecedorForm.cnpj.trim() || !fornecedorForm.endereco.trim() || !fornecedorForm.telefone.trim() || !fornecedorForm.email.trim()) {
+                          setFornecedorError('Todos os campos marcados com * são obrigatórios.')
+                          return
+                        }
+                        setFornecedorSaving(true)
+                        setFornecedorError('')
+                        try {
+                          await atualizarFornecedor(fornecedorEdit.id, fornecedorForm)
+                          setFornecedorSuccess('Fornecedor atualizado com sucesso!')
+                          const updated = await listarFornecedoresCompleto()
+                          setFornecedoresList(updated)
+                          setTimeout(() => {
+                            setFornecedorView('list')
+                            setFornecedorEdit(null)
+                            setFornecedorSuccess('')
+                          }, 1200)
+                        } catch (err) {
+                          setFornecedorError(err instanceof Error ? err.message : 'Erro ao salvar.')
+                        } finally {
+                          setFornecedorSaving(false)
+                        }
+                      }}
+                      disabled={fornecedorSaving}
+                      className="px-6 py-2 text-sm font-semibold rounded-lg bg-[#ff6a00] text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
+                    >
+                      {fornecedorSaving ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* === NFs VIEW === */}
+              {fornecedorView === 'nfs' && (
+                <>
+                  {fornecedorNFsLoading ? (
+                    <div className="text-center py-12 text-gray-400 text-sm">Carregando notas fiscais...</div>
+                  ) : fornecedorNFs.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 text-sm">Nenhuma NF encontrada para este fornecedor.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">NF</th>
+                            <th className="text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Emissão</th>
+                            <th className="text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Recebimento</th>
+                            <th className="text-center px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Volumes</th>
+                            <th className="text-center px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fornecedorNFs.map((nf) => (
+                            <tr key={nf.id} className="border-t border-gray-100 hover:bg-gray-50/50">
+                              <td className="px-4 py-2.5 font-mono text-xs font-medium text-gray-900">{nf.numero_nf}</td>
+                              <td className="px-4 py-2.5 text-gray-600">{nf.data_emissao ? new Date(nf.data_emissao).toLocaleDateString('pt-BR') : '—'}</td>
+                              <td className="px-4 py-2.5 text-gray-600">{nf.data_recebimento ? new Date(nf.data_recebimento).toLocaleDateString('pt-BR') : '—'}</td>
+                              <td className="px-4 py-2.5 text-center">{nf.volumes}</td>
+                              <td className="px-4 py-2.5 text-center">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  nf.status === 'ENTREGUE' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                                }`}>
+                                  {nf.status === 'ENTREGUE' ? 'Entregue' : 'Em Trânsito'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

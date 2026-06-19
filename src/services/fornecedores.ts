@@ -1,4 +1,72 @@
 import { supabase } from '@/lib/supabase'
+import type { Fornecedor } from '@/types'
+
+// ============================================
+// CRUD DE FORNECEDORES
+// ============================================
+
+/**
+ * Lista todos os fornecedores com todos os campos.
+ */
+export async function listarFornecedoresCompleto(): Promise<Fornecedor[]> {
+  const { data, error } = await supabase
+    .from('fornecedores')
+    .select('*')
+    .order('nome_fantasia', { ascending: true })
+
+  if (error) throw new Error(`Erro ao listar fornecedores: ${error.message}`)
+  return data || []
+}
+
+/**
+ * Busca um fornecedor pelo ID.
+ */
+export async function buscarFornecedorPorId(id: string): Promise<Fornecedor | null> {
+  const { data, error } = await supabase
+    .from('fornecedores')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) return null
+  return data
+}
+
+/**
+ * Atualiza dados de um fornecedor.
+ */
+export async function atualizarFornecedor(
+  id: string,
+  dados: Partial<Omit<Fornecedor, 'id' | 'created_at'>>
+): Promise<Fornecedor> {
+  const { data, error } = await supabase
+    .from('fornecedores')
+    .update(dados)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw new Error(`Erro ao atualizar fornecedor: ${error.message}`)
+  return data
+}
+
+/**
+ * Busca todas as NFs vinculadas a um fornecedor pelo nome_fantasia.
+ */
+export async function buscarNFsPorFornecedor(nomeFantasia: string) {
+  const { data, error } = await supabase
+    .from('notas_fiscais')
+    .select('id, numero_nf, data_emissao, data_recebimento, status, volumes, fornecedor, cnpj')
+    .eq('fornecedor', nomeFantasia)
+    .order('data_emissao', { ascending: false })
+
+  if (error) throw new Error(`Erro ao buscar NFs do fornecedor: ${error.message}`)
+  return data || []
+}
+
+// ============================================
+// FUNÇÕES DE RESOLUÇÃO (existentes)
+// ============================================
 
 /**
  * Resolve razao social para nome fantasia usando a tabela fornecedores.
@@ -80,7 +148,7 @@ export async function resolverCodigoFornecedor(
 }
 
 /**
- * Lista todos os fornecedores cadastrados.
+ * Lista todos os fornecedores cadastrados (versão simples).
  */
 export async function listarFornecedores(): Promise<{ razao_social: string; nome_fantasia: string }[]> {
   const { data, error } = await supabase
