@@ -8,6 +8,8 @@ import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio 
 import { supabase } from '@/lib/supabase'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao, Fornecedor } from '@/types'
 import { listarFornecedoresCompleto, atualizarFornecedor, buscarNFsPorFornecedor } from '@/services/fornecedores'
+import { buscarEstatisticasEntrega, buscarNFsComEstimativa } from '@/services/entregas'
+import type { EstatisticaTransportadora, NFEmTransitoEstimativa } from '@/services/entregas'
 
 // Tipo enriquecido com dados de referência
 interface MovimentacaoEnriquecida extends EstoqueMovimentacao {
@@ -20,7 +22,7 @@ import {
   PieLabelRenderProps,
 } from 'recharts'
 
-type Tab = 'estoque' | 'enviar-full' | 'historico'
+type Tab = 'estoque' | 'enviar-full' | 'historico' | 'entregas'
 
 const MOTIVOS: { value: MotivoAjuste; label: string }[] = [
   { value: 'DEVOLUCAO', label: 'Devolução' },
@@ -61,6 +63,7 @@ export default function EstoquePage() {
             { id: 'estoque' as Tab, label: 'Estoque' },
             { id: 'enviar-full' as Tab, label: 'Enviar FULL' },
             { id: 'historico' as Tab, label: 'Histórico FULL' },
+            { id: 'entregas' as Tab, label: 'Estimativa Entrega' },
           ].map((t) => (
             <button
               key={t.id}
@@ -79,6 +82,7 @@ export default function EstoquePage() {
         {tab === 'estoque' && <TabEstoque />}
         {tab === 'enviar-full' && <TabEnviarFull />}
         {tab === 'historico' && <TabHistorico />}
+        {tab === 'entregas' && <TabEntregas />}
       </div>
     </div>
   )
@@ -1957,6 +1961,263 @@ function TabHistorico() {
             )}
           </div>
         ))
+      )}
+    </div>
+  )
+}
+
+// ============================================
+// TAB: ESTIMATIVA DE ENTREGA
+// ============================================
+function TabEntregas() {
+  const [stats, setStats] = useState<EstatisticaTransportadora[]>([])
+  const [nfsTransito, setNfsTransito] = useState<NFEmTransitoEstimativa[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    carregarDados()
+  }, [])
+
+  async function carregarDados() {
+    setLoading(true)
+    try {
+      const [statsData, nfsData] = await Promise.all([
+        buscarEstatisticasEntrega(),
+        buscarNFsComEstimativa(),
+      ])
+      setStats(statsData)
+      setNfsTransito(nfsData)
+    } catch (err) {
+      console.error('Erro ao carregar estimativas:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function getNomeResumido(transportadora: string): string {
+    // Pegar só a primeira parte do nome (antes de LTDA, ASSESSORIA, etc.)
+    const palavras = transportadora.split(' ')
+    if (palavras.length <= 2) return transportadora
+    // Pegar as 2 primeiras palavras significativas
+    const significativas = palavras.filter(p => !['DE', 'DO', 'DA', 'E', 'LTDA', 'S/A', 'S.A.'].includes(p.toUpperCase()))
+    return significativas.slice(0, 2).join(' ')
+  }
+
+  function getCorVelocidade(media: number | null): { bg: string; text: string; label: string; icon: string } {
+    if (media === null) return { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Sem dados', icon: '?' }
+    if (media <= 3) return { bg: 'bg-emerald-50', text: 'text-emerald-700', label: 'Rapido', icon: '>' }
+    if (media <= 5) return { bg: 'bg-amber-50', text: 'text-amber-700', label: 'Normal', icon: '=' }
+    return { bg: 'bg-red-50', text: 'text-red-700', label: 'Lento', icon: '<' }
+  }
+
+  function getCorStatusTransito(status: string): string {
+    switch (status) {
+      case 'no_prazo': return 'bg-emerald-100 text-emerald-800'
+      case 'atencao': return 'bg-amber-100 text-amber-800'
+      case 'atrasado': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-600'
+    }
+  }
+
+  function getLabelStatusTransito(status: string): string {
+    switch (status) {
+      case 'no_prazo': return 'No prazo'
+      case 'atencao': return 'Atencao'
+      case 'atrasado': return 'Atrasado'
+      default: return 'Sem histórico'
+    }
+  }
+
+  function formatarData(data: string): string {
+    return new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-2 border-[#ff6a00] border-t-transparent rounded-full animate-spin" />
+        <span className="ml-3 text-gray-500 text-sm">Carregando estimativas...</span>
+      </div>
+    )
+  }
+
+  const totalEntregues = stats.reduce((s, t) => s + t.entregues, 0)
+  const totalTransito = stats.reduce((s, t) => s + t.em_transito, 0)
+  const mediasValidas = stats.filter(s => s.media_dias !== null)
+  const mediaGeral = mediasValidas.length > 0
+    ? Math.round((mediasValidas.reduce((s, t) => s + t.media_dias!, 0) / mediasValidas.length) * 10) / 10
+    : null
+
+  // Dados para o gráfico de barras
+  const dadosGrafico = stats
+    .filter(s => s.media_dias !== null)
+    .map(s => ({
+      nome: getNomeResumido(s.transportadora),
+      media: s.media_dias,
+      min: s.min_dias,
+      max: s.max_dias,
+    }))
+
+  return (
+    <div className="space-y-6">
+      {/* Resumo geral */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Transportadoras</p>
+          <p className="text-3xl font-bold text-gray-900 mt-1">{stats.length}</p>
+          <p className="text-xs text-gray-400 mt-1">cadastradas</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">NFs Entregues</p>
+          <p className="text-3xl font-bold text-emerald-600 mt-1">{totalEntregues}</p>
+          <p className="text-xs text-gray-400 mt-1">com dados de tempo</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Em Trânsito</p>
+          <p className="text-3xl font-bold text-amber-600 mt-1">{totalTransito}</p>
+          <p className="text-xs text-gray-400 mt-1">aguardando entrega</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Média Geral</p>
+          <p className="text-3xl font-bold text-[#ff6a00] mt-1">{mediaGeral ?? '-'}</p>
+          <p className="text-xs text-gray-400 mt-1">{mediaGeral !== null ? 'dias para entrega' : 'sem dados'}</p>
+        </div>
+      </div>
+
+      {/* Gráfico de barras */}
+      {dadosGrafico.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Média de dias por transportadora</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={dadosGrafico} layout="vertical" margin={{ left: 10, right: 30, top: 5, bottom: 5 }}>
+              <XAxis type="number" tick={{ fontSize: 12 }} domain={[0, 'auto']} unit=" d" />
+              <YAxis type="category" dataKey="nome" tick={{ fontSize: 12 }} width={120} />
+              <Tooltip
+                formatter={(value, name) => {
+                  const v = value ?? 0
+                  if (name === 'media') return [`${v} dias`, 'Média']
+                  if (name === 'min') return [`${v} dias`, 'Mínimo']
+                  if (name === 'max') return [`${v} dias`, 'Máximo']
+                  return [`${v}`, String(name)]
+                }}
+                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 13 }}
+              />
+              <Bar dataKey="min" fill="#bbf7d0" radius={[4, 0, 0, 4]} stackId="range" name="min" />
+              <Bar dataKey="media" fill="#ff6a00" radius={[0, 0, 0, 0]} name="media" />
+              <Bar dataKey="max" fill="#fecaca" radius={[0, 4, 4, 0]} stackId="range2" name="max" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Cards por transportadora */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Detalhes por transportadora</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {stats.map((t) => {
+            const cor = getCorVelocidade(t.media_dias)
+            return (
+              <div key={t.transportadora} className={`rounded-xl border border-gray-200 p-5 shadow-sm ${cor.bg}`}>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate" title={t.transportadora}>
+                      {getNomeResumido(t.transportadora)}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate" title={t.transportadora}>
+                      {t.transportadora}
+                    </p>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ml-2 whitespace-nowrap ${cor.text} ${cor.bg}`}>
+                    {cor.icon} {cor.label}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {t.media_dias !== null ? t.media_dias : '-'}
+                    </p>
+                    <p className="text-xs text-gray-500">média (dias)</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-gray-700">
+                      {t.min_dias !== null ? `${t.min_dias}-${t.max_dias}` : '-'}
+                    </p>
+                    <p className="text-xs text-gray-500">min-max</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-gray-700">{t.total_nfs}</p>
+                    <p className="text-xs text-gray-500">
+                      NFs ({t.entregues} ok {t.em_transito > 0 ? `${t.em_transito} transit` : ''})
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* NFs em trânsito com estimativa */}
+      {nfsTransito.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700">
+              NFs em transito - previsao de entrega
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Estimativa baseada no historico de cada transportadora
+            </p>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                <th className="text-left px-6 py-3 font-medium">NF</th>
+                <th className="text-left px-4 py-3 font-medium">Fornecedor</th>
+                <th className="text-left px-4 py-3 font-medium">Transportadora</th>
+                <th className="text-center px-4 py-3 font-medium">Emissao</th>
+                <th className="text-center px-4 py-3 font-medium">Dias em transito</th>
+                <th className="text-center px-4 py-3 font-medium">Previsao</th>
+                <th className="text-center px-4 py-3 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nfsTransito.map((nf) => (
+                <tr key={nf.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <td className="px-6 py-3 font-mono font-medium text-gray-900">{nf.numero_nf}</td>
+                  <td className="px-4 py-3 text-gray-700">{nf.fornecedor}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{getNomeResumido(nf.transportadora)}</td>
+                  <td className="px-4 py-3 text-center text-gray-500">{formatarData(nf.data_emissao)}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className="font-semibold text-gray-900">{nf.dias_em_transito}</span>
+                    <span className="text-gray-400 text-xs ml-1">dias</span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {nf.estimativa_entrega ? (
+                      <span className="text-gray-700">{formatarData(nf.estimativa_entrega)}</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${getCorStatusTransito(nf.status_estimativa)}`}>
+                      {getLabelStatusTransito(nf.status_estimativa)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Sem NFs em trânsito */}
+      {nfsTransito.length === 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center shadow-sm">
+          <p className="text-4xl mb-2">OK</p>
+          <p className="text-sm font-medium text-gray-700">Nenhuma NF em trânsito</p>
+          <p className="text-xs text-gray-400 mt-1">Todas as notas fiscais foram entregues</p>
+        </div>
       )}
     </div>
   )
