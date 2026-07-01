@@ -723,7 +723,9 @@ function TabEstoque() {
                           {item.codigo_ml}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-700 max-w-[220px] truncate font-medium">{item.produto}</td>
+                      <td className="px-4 py-3 text-gray-700 max-w-[400px] font-medium" title={item.produto}>
+                        <span className="block truncate">{item.produto}</span>
+                      </td>
                       <td className="px-4 py-3">
                         <span className="text-xs bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-gray-600">
                           {item.fornecedor_principal || '—'}
@@ -1677,8 +1679,8 @@ function TabEnviarFull() {
                 <tbody>
                   {csvItens.map((item, i) => (
                     <tr key={i} className="border-b border-gray-100">
-                      <td className="px-6 py-3 text-gray-600 text-xs max-w-[220px] truncate">
-                        {item.descricao || '—'}
+                      <td className="px-6 py-3 text-gray-600 text-xs max-w-[400px]" title={item.descricao || ''}>
+                        <span className="block truncate">{item.descricao || '—'}</span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400">{item.fornecedor || '—'}</td>
                       <td className="px-4 py-3">
@@ -2215,7 +2217,7 @@ function TabEntregas() {
       {nfsTransito.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center shadow-sm">
           <p className="text-4xl mb-2">OK</p>
-          <p className="text-sm font-medium text-gray-700">Nenhuma NF em trânsito</p>
+          <p className="text-sm font-medium text-gray-700">Nenhuma NF em transito</p>
           <p className="text-xs text-gray-400 mt-1">Todas as notas fiscais foram entregues</p>
         </div>
       )}
