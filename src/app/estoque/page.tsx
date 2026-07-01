@@ -723,8 +723,8 @@ function TabEstoque() {
                           {item.codigo_ml}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-700 max-w-[400px] font-medium" title={item.produto}>
-                        <span className="block truncate">{item.produto}</span>
+                      <td className="px-4 py-3 text-gray-700 max-w-[220px] font-medium">
+                        <span className="block leading-tight text-sm">{item.produto}</span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-gray-600">
@@ -1679,8 +1679,8 @@ function TabEnviarFull() {
                 <tbody>
                   {csvItens.map((item, i) => (
                     <tr key={i} className="border-b border-gray-100">
-                      <td className="px-6 py-3 text-gray-600 text-xs max-w-[400px]" title={item.descricao || ''}>
-                        <span className="block truncate">{item.descricao || '—'}</span>
+                      <td className="px-6 py-3 text-gray-600 text-xs max-w-[220px]">
+                        <span className="block leading-tight">{item.descricao || '—'}</span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400">{item.fornecedor || '—'}</td>
                       <td className="px-4 py-3">
