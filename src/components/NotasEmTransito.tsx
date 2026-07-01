@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { NotaEmTransito, ItemNF } from '@/types'
 import { listarNotasEmTransito, buscarItensNF, confirmarRecebimento } from '@/services/notas-fiscais'
+import { buscarEstatisticasEntrega } from '@/services/entregas'
 import ConfirmModal from './ConfirmModal'
 import XmlViewer from './XmlViewer'
 
@@ -10,6 +11,7 @@ export default function NotasEmTransito() {
   const [notas, setNotas] = useState<NotaEmTransito[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [mediasPorTransp, setMediasPorTransp] = useState<Record<string, number>>({})
 
   // Viewer
   const [viewerOpen, setViewerOpen] = useState(false)
@@ -25,8 +27,18 @@ export default function NotasEmTransito() {
   const carregarNotas = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await listarNotasEmTransito()
+      const [data, stats] = await Promise.all([
+        listarNotasEmTransito(),
+        buscarEstatisticasEntrega(),
+      ])
       setNotas(data)
+      const medias: Record<string, number> = {}
+      for (const s of stats) {
+        if (s.media_dias !== null) {
+          medias[s.transportadora] = s.media_dias
+        }
+      }
+      setMediasPorTransp(medias)
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar notas')
@@ -74,7 +86,7 @@ export default function NotasEmTransito() {
   }
 
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return '—'
+    if (!dateStr) return '-'
     const [y, m, d] = dateStr.split('-')
     return `${d}/${m}/${y}`
   }
@@ -85,10 +97,29 @@ export default function NotasEmTransito() {
     return 'text-red-400'
   }
 
+  const renderPrevisao = (nota: NotaEmTransito) => {
+    const transp = nota.transportadora || ''
+    const media = mediasPorTransp[transp]
+    if (media === undefined || !nota.data_emissao) {
+      return <td className="px-4 py-4 text-center text-crunch-ink-mute text-xs">--</td>
+    }
+    const emissao = new Date(nota.data_emissao)
+    const estimada = new Date(emissao)
+    estimada.setDate(estimada.getDate() + Math.ceil(media))
+    const hoje = new Date()
+    const cor = estimada >= hoje ? 'text-green-400' : 'text-red-400'
+    const dataStr = formatDate(estimada.toISOString().split('T')[0])
+    return (
+      <td className="px-4 py-4 text-center">
+        <span className={`font-medium text-xs ${cor}`}>{dataStr}</span>
+      </td>
+    )
+  }
+
   if (loading) {
     return (
       <div className="bg-crunch-panel border border-crunch-line rounded-2xl p-8">
-        <div className="text-center text-crunch-ink-mute">Carregando notas em trânsito...</div>
+        <div className="text-center text-crunch-ink-mute">Carregando notas...</div>
       </div>
     )
   }
@@ -101,7 +132,7 @@ export default function NotasEmTransito() {
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-crunch-accent animate-pulse" />
             <h3 className="text-sm font-semibold uppercase tracking-wider text-crunch-ink-dim">
-              Notas Fiscais em Trânsito
+              Notas Fiscais em Transito
             </h3>
           </div>
           <span className="text-xs font-mono bg-crunch-panel-2 border border-crunch-line-2 px-3 py-1 rounded-full text-crunch-accent">
@@ -117,7 +148,7 @@ export default function NotasEmTransito() {
 
         {notas.length === 0 ? (
           <div className="px-6 py-12 text-center text-crunch-ink-mute text-sm">
-            Nenhuma nota fiscal em trânsito.
+            Nenhuma nota fiscal em transito.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -129,8 +160,9 @@ export default function NotasEmTransito() {
                   <th className="text-left px-4 py-3 font-semibold">Transportadora</th>
                   <th className="text-center px-4 py-3 font-semibold">Volumes</th>
                   <th className="text-left px-4 py-3 font-semibold">Faturamento</th>
-                  <th className="text-center px-4 py-3 font-semibold">Dias Úteis</th>
-                  <th className="text-center px-4 py-3 font-semibold">Ações</th>
+                  <th className="text-center px-4 py-3 font-semibold">Dias</th>
+                  <th className="text-center px-4 py-3 font-semibold">Previsao</th>
+                  <th className="text-center px-4 py-3 font-semibold">Acoes</th>
                 </tr>
               </thead>
               <tbody>
@@ -141,12 +173,13 @@ export default function NotasEmTransito() {
                   >
                     <td className="px-6 py-4 font-medium">{nota.fornecedor}</td>
                     <td className="px-4 py-4 font-mono text-crunch-ink-dim">{nota.numero_nf}</td>
-                    <td className="px-4 py-4 text-crunch-ink-dim text-xs">{nota.transportadora || '—'}</td>
+                    <td className="px-4 py-4 text-crunch-ink-dim text-xs">{nota.transportadora || '-'}</td>
                     <td className="px-4 py-4 text-center text-crunch-ink-dim">{nota.volumes}</td>
                     <td className="px-4 py-4 text-crunch-ink-dim">{formatDate(nota.data_emissao)}</td>
                     <td className={`px-4 py-4 text-center font-semibold ${getDiasUteisColor(nota.dias_uteis)}`}>
                       {nota.dias_uteis}d
                     </td>
+                    {renderPrevisao(nota)}
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -180,11 +213,11 @@ export default function NotasEmTransito() {
         onClose={() => { setViewerOpen(false); setViewerNota(null) }}
       />
 
-      {/* Modal de confirmação */}
+      {/* Modal de confirmacao */}
       <ConfirmModal
         isOpen={confirmOpen}
         title="Confirmar Recebimento"
-        message={`Confirmar recebimento da NF ${confirmNota?.numero_nf} de ${confirmNota?.fornecedor}? Os itens serão adicionados ao estoque.`}
+        message={`Confirmar recebimento da NF ${confirmNota?.numero_nf} de ${confirmNota?.fornecedor}? Os itens serao adicionados ao estoque.`}
         confirmLabel="Confirmar Entrega"
         onConfirm={handleConfirmarRecebimento}
         onCancel={() => { setConfirmOpen(false); setConfirmNota(null) }}
