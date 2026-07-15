@@ -155,6 +155,15 @@ function TabEstoque() {
   const [fornecedorNFsLoading, setFornecedorNFsLoading] = useState(false)
   const [fornecedorView, setFornecedorView] = useState<'list' | 'edit' | 'nfs'>('list')
 
+  // Modal Imprimir Etiqueta
+  const [printOpen, setPrintOpen] = useState(false)
+  const [printItem, setPrintItem] = useState<SaldoEstoque | null>(null)
+  const [printQtd, setPrintQtd] = useState('')
+  const [printLoading, setPrintLoading] = useState(false)
+  const [printSuccess, setPrintSuccess] = useState('')
+  const [printError, setPrintError] = useState('')
+  const etiquetasCache = useRef<{ code: string; desc: string; file: string; fornecedor: string; zpl: string }[] | null>(null)
+
   const carregarEstoque = useCallback(async () => {
     setLoading(true)
     try {
@@ -491,6 +500,72 @@ function TabEstoque() {
     return { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500', label: '' }
   }
 
+  // === Handlers Imprimir Etiqueta ===
+  const openPrintEtiqueta = (item: SaldoEstoque) => {
+    setPrintItem(item)
+    setPrintQtd(String(Math.max(0, item.quantidade_disponivel)))
+    setPrintError('')
+    setPrintSuccess('')
+    setPrintOpen(true)
+  }
+
+  const handlePrintEtiqueta = async () => {
+    if (!printItem) return
+    const qtd = parseInt(printQtd, 10)
+    if (isNaN(qtd) || qtd <= 0) {
+      setPrintError('Informe uma quantidade válida maior que zero.')
+      return
+    }
+    setPrintLoading(true)
+    setPrintError('')
+    setPrintSuccess('')
+    try {
+      // Carregar etiquetas (cache para não buscar toda vez)
+      if (!etiquetasCache.current) {
+        const res = await fetch('/etiquetas/etiquetas-prontas.json')
+        if (!res.ok) throw new Error('Erro ao carregar base de etiquetas.')
+        etiquetasCache.current = await res.json()
+      }
+
+      // Buscar codigo_fornecedor no Supabase
+      const { data: prodData } = await supabase
+        .from('produtos')
+        .select('codigo_fornecedor')
+        .eq('codigo_ml', printItem.codigo_ml)
+        .limit(1)
+      const codigoFornecedor = prodData?.[0]?.codigo_fornecedor
+
+      // Tentar match por codigo_fornecedor, depois por codigo_ml
+      let etiqueta = etiquetasCache.current?.find(
+        (e) => codigoFornecedor && e.code.toUpperCase() === codigoFornecedor.toUpperCase()
+      )
+      if (!etiqueta) {
+        etiqueta = etiquetasCache.current?.find(
+          (e) => e.code.toUpperCase() === printItem.codigo_ml.toUpperCase()
+        )
+      }
+
+      if (!etiqueta) {
+        setPrintError(
+          `Etiqueta não encontrada para ${printItem.codigo_ml}${codigoFornecedor ? ` (SKU: ${codigoFornecedor})` : ''}. Verifique se a etiqueta foi cadastrada na aba Etiquetas de Produto.`
+        )
+        return
+      }
+
+      // Injetar quantidade: ^PQ antes de ^XZ
+      let zpl = etiqueta.zpl
+      zpl = zpl.replace(/\^XZ/g, `^PQ${qtd},0,0,Y\n^XZ`)
+
+      // Copiar para clipboard
+      await navigator.clipboard.writeText(zpl)
+      setPrintSuccess(`ZPL copiado! ${qtd} etiqueta(s) de "${etiqueta.desc}" prontas para impressão.`)
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Erro ao gerar ZPL.')
+    } finally {
+      setPrintLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -778,6 +853,17 @@ function TabEstoque() {
                               <path d="M8 4v4l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
                               <path d="M2 8a6 6 0 0112 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => openPrintEtiqueta(item)}
+                            title="Imprimir etiqueta"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-[#ff6a00] hover:border-orange-300 hover:bg-orange-50 transition-colors bg-white"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                              <path d="M4 6V1h8v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <rect x="1" y="6" width="14" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                              <path d="M4 12v3h8v-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           </button>
                           <button
@@ -1514,6 +1600,96 @@ function TabEstoque() {
                   )}
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL IMPRIMIR ETIQUETA ========== */}
+      {printOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setPrintOpen(false)} />
+          <div className="relative bg-white border border-gray-200 rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="none" className="text-[#ff6a00]">
+                  <path d="M4 6V1h8v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <rect x="1" y="6" width="14" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M4 12v3h8v-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Imprimir Etiqueta</h3>
+            </div>
+            <p className="text-xs text-gray-400 mb-6 ml-[52px]">
+              <span className="font-mono text-[#ff6a00] font-medium">{printItem?.codigo_ml}</span>
+              {' — '}{printItem?.produto}
+            </p>
+
+            {printError && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-600">{printError}</div>
+            )}
+            {printSuccess && (
+              <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-600 flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {printSuccess}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* Info estoque */}
+              <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Estoque atual</span>
+                  <span className="text-sm font-bold text-gray-900">{printItem?.quantidade_disponivel} un.</span>
+                </div>
+              </div>
+
+              {/* Quantidade de etiquetas */}
+              <div>
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">
+                  Quantidade de etiquetas
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={printQtd}
+                  onChange={(e) => setPrintQtd(e.target.value)}
+                  placeholder="Ex: 10"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                />
+                <p className="text-[10px] text-gray-400 mt-1.5">
+                  Pré-preenchido com a quantidade em estoque. Ajuste conforme necessário.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={() => setPrintOpen(false)}
+                disabled={printLoading}
+                className="px-5 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handlePrintEtiqueta}
+                disabled={printLoading}
+                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[#ff6a00] hover:bg-orange-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+              >
+                {printLoading ? (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M4 6V1h8v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <rect x="1" y="6" width="14" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M4 12v3h8v-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+                Gerar ZPL
+              </button>
             </div>
           </div>
         </div>
