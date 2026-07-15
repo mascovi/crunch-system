@@ -1,39 +1,9 @@
 [
   {
-    "code": "SMRL62029",
-    "desc": "Collagen Protein Neutro Puravida",
-    "file": "SMRL62029 - Collagen Protein Neutro Puravida.txt",
-    "fornecedor": "PURAVIDA"
-  },
-  {
-    "code": "VCEL30688",
-    "desc": "Collagen Protein Puravida Berries Silvestres",
-    "file": "VCEL30688 - Collagen Protein Puravida Berries Silvestres.txt",
-    "fornecedor": "PURAVIDA"
-  },
-  {
-    "code": "GZFD33923",
-    "desc": "Ômega 3 Epa Dha Puravida Aroma De Limão",
-    "file": "GZFD33923 - Ômega 3 Epa Dha Puravida Aroma De Limão.txt",
-    "fornecedor": "PURAVIDA"
-  },
-  {
-    "code": "DSZJ08000",
-    "desc": "Trimag Puravida - 3 Tipos De Magnesio - Softgels",
-    "file": "DSZJ08000 - Trimag Puravida - 3 Tipos De Magnesio - Softgels.txt",
-    "fornecedor": "PURAVIDA"
-  },
-  {
-    "code": "SMNX61894",
-    "desc": "Vit C+ Puravida Vitamina C",
-    "file": "SMNX61894 - Vit C+ Puravida Vitamina C.txt",
-    "fornecedor": "PURAVIDA"
-  },
-  {
-    "code": "BVHQ62334",
-    "desc": "Iron Plus True Source Ferro Infantil Gotas Lipofer Morango",
-    "file": "BVHQ62334 - Iron Plus True Source Ferro Infantil Gotas Lipofer Morango.txt",
-    "fornecedor": "TRUE SOURCE"
+    "code": "ALWO97425",
+    "desc": "Vita D3 + C + Zinco Vitafor",
+    "file": "ALWO97425 - Vita D3 + C + Zinco Vitafor.txt",
+    "fornecedor": "VITAFOR"
   },
   {
     "code": "ARLJ79743",
@@ -42,58 +12,16 @@
     "fornecedor": "TRUE SOURCE"
   },
   {
-    "code": "GVEN82018",
-    "desc": "True Curcuma + Ômega 3 Plus",
-    "file": "GVEN82018 - True Curcuma + Ômega 3 Plus.txt",
-    "fornecedor": "TRUE SOURCE"
+    "code": "BADP82189",
+    "desc": "Whey Isofort Plant",
+    "file": "BADP82189 - Whey Isofort Plant.txt",
+    "fornecedor": "VITAFOR"
   },
   {
-    "code": "QHWO92203",
-    "desc": "True Magnésio + Inositol 3.0",
-    "file": "QHWO92203 - True Magnésio + Inositol 3.0.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "STUW93194",
-    "desc": "True Magnésio + Inositol 3.0",
-    "file": "STUW93194 - True Magnésio + Inositol 3.0.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "DDQN39019",
-    "desc": "True Source Nac - N Acetil L-cisteína",
-    "file": "DDQN39019 - True Source Nac - N Acetil L-cisteína.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "TDZB58581",
-    "desc": "True Vitamina C Lipossomal",
-    "file": "TDZB58581 - True Vitamina C Lipossomal.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "QZFH96077",
-    "desc": "True Whey Isolada & Concentrada - Creamy Chocolate",
-    "file": "QZFH96077 - True Whey Isolada & Concentrada - Creamy Chocolate.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "DYLI28254",
-    "desc": "True Whey Isolada & Concentrada - Red Berries",
-    "file": "DYLI28254 - True Whey Isolada & Concentrada - Red Berries.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "TVKG96083",
-    "desc": "True Whey Isolada & Concentrada - Vanilla Ice Cream",
-    "file": "TVKG96083 - True Whey Isolada & Concentrada - Vanilla Ice Cream.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "JDRB58974",
-    "desc": "True Whey Isolada & Concentrada - Yummy Milk",
-    "file": "JDRB58974 - True Whey Isolada & Concentrada - Yummy Milk.txt",
-    "fornecedor": "TRUE SOURCE"
+    "code": "BCFL14302",
+    "desc": "Ocean Drop Magnésio Plus — 4 Tipos Magnésio 180 Cápsulas",
+    "file": "BCFL14302 - Ocean Drop Magnésio Plus - 4 Tipos Magnésio 180 Cápsulas.txt",
+    "fornecedor": "OCEAN DROP"
   },
   {
     "code": "BDKS07675",
@@ -102,27 +30,15 @@
     "fornecedor": "TRUE SOURCE"
   },
   {
-    "code": "LUKW80917",
-    "desc": "True Whey Protein Vegan",
-    "file": "LUKW80917 - True Whey Protein Vegan.txt",
-    "fornecedor": "TRUE SOURCE"
+    "code": "BOJO68780",
+    "desc": "Whey Fort 3w Premium - Chocolate",
+    "file": "BOJO68780 - Whey Fort 3w Premium - Chocolate.txt",
+    "fornecedor": "VITAFOR"
   },
   {
-    "code": "SEIC80407",
-    "desc": "True Whey Protein Vegan",
-    "file": "SEIC80407 - True Whey Protein Vegan.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "YDDW81835",
-    "desc": "True Whey Protein Vegan",
-    "file": "YDDW81835 - True Whey Protein Vegan.txt",
-    "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "DTIN27987",
-    "desc": "Vitamina D Líquido - Baby Kids Framboesa",
-    "file": "DTIN27987 - Vitamina D Líquido - Baby Kids Framboesa.txt",
+    "code": "BVHQ62334",
+    "desc": "Iron Plus True Source Ferro Infantil Gotas Lipofer Morango",
+    "file": "BVHQ62334 - Iron Plus True Source Ferro Infantil Gotas Lipofer Morango.txt",
     "fornecedor": "TRUE SOURCE"
   },
   {
@@ -132,52 +48,10 @@
     "fornecedor": "TRUE SOURCE"
   },
   {
-    "code": "VIST29084",
-    "desc": "Whey Protein - Isoladado E Hidrolisado Dark Chocolate",
-    "file": "VIST29084 - Whey Protein - Isoladado E Hidrolisado Dark Chocolate.txt",
+    "code": "DDQN39019",
+    "desc": "True Source Nac - N Acetil L-cisteína",
+    "file": "DDQN39019 - True Source Nac - N Acetil L-cisteína.txt",
     "fornecedor": "TRUE SOURCE"
-  },
-  {
-    "code": "PJZI64173",
-    "desc": "Aminovita Aminoácidos Essenciais Plus",
-    "file": "PJZI64173 - Aminovita Aminoácidos Essenciais Plus.txt",
-    "fornecedor": "VITAFOR"
-  },
-  {
-    "code": "LAVI72472",
-    "desc": "Coqueteleira Whey - Shaker Pré-treino Vermelho",
-    "file": "LAVI72472 - Coqueteleira Whey - Shaker Pré-treino Vermelho.txt",
-    "fornecedor": "VITAFOR"
-  },
-  {
-    "code": "KGLE32758",
-    "desc": "Enzyfor - Mix Enzimas Digestivas Plus",
-    "file": "KGLE32758 - Enzyfor - Mix Enzimas Digestivas Plus.txt",
-    "fornecedor": "VITAFOR"
-  },
-  {
-    "code": "TUHW45726",
-    "desc": "Ferro Plus Vitafor Com Vitamina C",
-    "file": "TUHW45726 - Ferro Plus Vitafor Com Vitamina C.txt",
-    "fornecedor": "VITAFOR"
-  },
-  {
-    "code": "DVFM93333",
-    "desc": "Imunomult Vitafor",
-    "file": "DVFM93333 - Imunomult Vitafor.txt",
-    "fornecedor": "VITAFOR"
-  },
-  {
-    "code": "GIPU69453",
-    "desc": "Isocrisp Plant Vegan - Nutrição Vegana",
-    "file": "GIPU69453 - Isocrisp Plant Vegan - Nutrição Vegana.txt",
-    "fornecedor": "VITAFOR"
-  },
-  {
-    "code": "UHLS31160",
-    "desc": "Omegafor Memory Vitafor",
-    "file": "UHLS31160 - Omegafor Memory Vitafor.txt",
-    "fornecedor": "VITAFOR"
   },
   {
     "code": "DKOT13671",
@@ -186,34 +60,166 @@
     "fornecedor": "VITAFOR"
   },
   {
+    "code": "DSZJ08000",
+    "desc": "Trimag Puravida - 3 Tipos De Magnesio - Softgels",
+    "file": "DSZJ08000 - Trimag Puravida - 3 Tipos De Magnesio - Softgels.txt",
+    "fornecedor": "PURAVIDA"
+  },
+  {
+    "code": "DTIN27987",
+    "desc": "Vitamina D Líquido - Baby Kids Framboesa",
+    "file": "DTIN27987 - Vitamina D Líquido - Baby Kids Framboesa.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "DVFM93333",
+    "desc": "Imunomult Vitafor",
+    "file": "DVFM93333 - Imunomult Vitafor.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "DYLI28254",
+    "desc": "True Whey Isolada & Concentrada - Red Berries",
+    "file": "DYLI28254 - True Whey Isolada & Concentrada - Red Berries.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "EQLS09433",
+    "desc": "True Source True Ômega 3 120 Cápsulas Epa & Dha",
+    "file": "EQLS09433 - True Source True Ômega 3 120 Cápsulas Epa & Dha True No Flav.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "FEDW75462",
+    "desc": "Multivitamínico Dha Líquido 30 Ml True Source — LARANJA",
+    "file": "FEDW75462 - Multivitamínico Dha Liquido 30 Ml True Source Sabor Laranja.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "FRMW16512",
+    "desc": "True Source True Vitamina C Lipossomal 180 Caps 1gr",
+    "file": "FRMW16512 - True Source True Vitamina C Lipossomal 180 Caps 1gr No Flavo.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "GIPU69453",
+    "desc": "Isocrisp Plant Vegan - Nutrição Vegana",
+    "file": "GIPU69453 - Isocrisp Plant Vegan - Nutrição Vegana.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "GVEN82018",
+    "desc": "True Curcuma + Ômega 3 Plus",
+    "file": "GVEN82018 - True Curcuma + Ômega 3 Plus.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "GZFD33923",
+    "desc": "Ômega 3 Epa Dha Puravida Aroma De Limão",
+    "file": "GZFD33923 - Ômega 3 Epa Dha Puravida Aroma De Limão.txt",
+    "fornecedor": "PURAVIDA"
+  },
+  {
+    "code": "HFEN13922",
+    "desc": "Ocean Drop Nac L-cisteína & Glutationa 120 Cápsulas",
+    "file": "HFEN13922 - Ocean Drop Nac L-cisteína & Glutationa 120 Cápsulas No Flavo.txt",
+    "fornecedor": "OCEAN DROP"
+  },
+  {
+    "code": "HPAT99142",
+    "desc": "True Source True Morning Energy Protein 20 Sachês — DOCE DE LEITE",
+    "file": "HPAT99142 - True Source True Morning Energy Protein Caixa 20 Sachês Doce.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "HXUZ33324",
+    "desc": "Vitafor Whey Isofort Premium 900g — BAUNILHA",
+    "file": "HXUZ33324 - Vitafor Whey Isofort Premium 900g Whey Isolada Pura Baunilha.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "IEWA14030",
+    "desc": "Ocean Drop Eletrólitos Em Pó Hidratação Inteligente",
+    "file": "IEWA14030 - Ocean Drop Eletrólitos Em Pó Hidratação Inteligente.txt",
+    "fornecedor": "OCEAN DROP"
+  },
+  {
     "code": "IOAN32114",
     "desc": "V-coffee Energy Boost - Cafeína & Taurina",
     "file": "IOAN32114 - V-coffee Energy Boost - Cafeína & Taurina.txt",
     "fornecedor": "VITAFOR"
   },
   {
-    "code": "ALWO97425",
-    "desc": "Vita D3 + C + Zinco Vitafor",
-    "file": "ALWO97425 - Vita D3 + C + Zinco Vitafor.txt",
+    "code": "JDRB58974",
+    "desc": "True Whey Isolada & Concentrada - Yummy Milk",
+    "file": "JDRB58974 - True Whey Isolada & Concentrada - Yummy Milk.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "KGLE32758",
+    "desc": "Enzyfor - Mix Enzimas Digestivas Plus",
+    "file": "KGLE32758 - Enzyfor - Mix Enzimas Digestivas Plus.txt",
     "fornecedor": "VITAFOR"
   },
   {
-    "code": "STWI71794",
-    "desc": "Whey Fort 3w Premium - Baunilha",
-    "file": "STWI71794 - Whey Fort 3w Premium - Baunilha.txt",
+    "code": "KGLE40277",
+    "desc": "Ômega 3 Super Dha Meg-3® 120 Cápsulas Puravida",
+    "file": "KGLE40277 - Ômega 3 Super Dha Meg-3® 120 Cápsulas Sem Sabor Puravida Sem.txt",
+    "fornecedor": "PURAVIDA"
+  },
+  {
+    "code": "KKBI54084",
+    "desc": "Whey Protein 100% Whey Concentrado 900g Vitafor — BAUNILHA",
+    "file": "KKBI54084 - Whey Protein Baunilha 100% Whey Concentrado 900g Vitafor.txt",
     "fornecedor": "VITAFOR"
   },
   {
-    "code": "BOJO68780",
-    "desc": "Whey Fort 3w Premium - Chocolate",
-    "file": "BOJO68780 - Whey Fort 3w Premium - Chocolate.txt",
+    "code": "KMSF12669",
+    "desc": "True Source Whey Protein Isolado Hidrolisado 837gr — FIOR DI LATTE",
+    "file": "KMSF12669 - True Source Whey Protein Isolado Hidrolisado Pote 837gr Fior.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "LAVI72472",
+    "desc": "Coqueteleira Whey - Shaker Pré-treino Vermelho",
+    "file": "LAVI72472 - Coqueteleira Whey - Shaker Pré-treino Vermelho.txt",
     "fornecedor": "VITAFOR"
   },
   {
-    "code": "BADP82189",
-    "desc": "Whey Isofort Plant",
-    "file": "BADP82189 - Whey Isofort Plant.txt",
+    "code": "LRKN08028",
+    "desc": "Propolis Verde Premium 60 Cápsulas Puravida",
+    "file": "LRKN08028 - Propolis Verde Premium Com 60 Cápsulas Puravida Sem Sabor.txt",
+    "fornecedor": "PURAVIDA"
+  },
+  {
+    "code": "LUBD34498",
+    "desc": "Vitafor Whey Isofort Premium 900g — CHOCOLATE",
+    "file": "LUBD34498 - Vitafor Whey Isofort Premium 900g Whey Isolada Pura Chocolat.txt",
     "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "LUKW80917",
+    "desc": "True Whey Protein Vegan",
+    "file": "LUKW80917 - True Whey Protein Vegan.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "MRCW65089",
+    "desc": "Aminovita Vitafor 240g Suplemento Vegano — MARACUJÁ",
+    "file": "MRCW65089 - Aminovita Vitafor 240g Maracujá Suplemento Vegano Aminoácido.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "OAKD97487",
+    "desc": "True Source True Morning Energy Protein 20 Sachês — DARK CHOCOLATE",
+    "file": "OAKD97487 - True Source True Morning Energy Protein Caixa 20 Sachês Dark.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "OKYI81336",
+    "desc": "True Source True Curcuma 60 Cápsulas Alta Concentração",
+    "file": "OKYI81336 - True Source True Curcuma 60 Capsulas Alta Concentração Sem S.txt",
+    "fornecedor": "TRUE SOURCE"
   },
   {
     "code": "PCBV68779",
@@ -228,9 +234,135 @@
     "fornecedor": "VITAFOR"
   },
   {
+    "code": "PJZI64173",
+    "desc": "Aminovita Aminoácidos Essenciais Plus",
+    "file": "PJZI64173 - Aminovita Aminoácidos Essenciais Plus.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "QHWO92203",
+    "desc": "True Magnésio + Inositol 3.0",
+    "file": "QHWO92203 - True Magnésio + Inositol 3.0.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "QZFH96077",
+    "desc": "True Whey Isolada & Concentrada - Creamy Chocolate",
+    "file": "QZFH96077 - True Whey Isolada & Concentrada - Creamy Chocolate.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "RNWJ96374",
+    "desc": "True Source Liquid Zinc 30ml Zinco Líquido Plus Infantil — MORANGO",
+    "file": "RNWJ96374 - True Source Liquid Zinc 30ml Zinco Líquido Plus Infantil Mor.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "SEIC80407",
+    "desc": "True Whey Protein Vegan",
+    "file": "SEIC80407 - True Whey Protein Vegan.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "SMNX61894",
+    "desc": "Vit C+ Puravida Vitamina C",
+    "file": "SMNX61894 - Vit C+ Puravida Vitamina C.txt",
+    "fornecedor": "PURAVIDA"
+  },
+  {
+    "code": "SMRL62029",
+    "desc": "Collagen Protein Neutro Puravida",
+    "file": "SMRL62029 - Collagen Protein Neutro Puravida.txt",
+    "fornecedor": "PURAVIDA"
+  },
+  {
+    "code": "STUW93194",
+    "desc": "True Magnésio + Inositol 3.0",
+    "file": "STUW93194 - True Magnésio + Inositol 3.0.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "STWI71794",
+    "desc": "Whey Fort 3w Premium - Baunilha",
+    "file": "STWI71794 - Whey Fort 3w Premium - Baunilha.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "TDZB58581",
+    "desc": "True Vitamina C Lipossomal",
+    "file": "TDZB58581 - True Vitamina C Lipossomal.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "TUHW45726",
+    "desc": "Ferro Plus Vitafor Com Vitamina C",
+    "file": "TUHW45726 - Ferro Plus Vitafor Com Vitamina C.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "TVKG96083",
+    "desc": "True Whey Isolada & Concentrada - Vanilla Ice Cream",
+    "file": "TVKG96083 - True Whey Isolada & Concentrada - Vanilla Ice Cream.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
     "code": "UHCZ82039",
     "desc": "Whey Isofort Plant",
     "file": "UHCZ82039 - Whey Isofort Plant.txt",
     "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "UHLS31160",
+    "desc": "Omegafor Memory Vitafor",
+    "file": "UHLS31160 - Omegafor Memory Vitafor.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "UMLY82459",
+    "desc": "Suplemento Alimentar V-fort Ultra 240g Vitafor — UVA",
+    "file": "UMLY82459 - Suplemento Alimentar V-fort Ultra Uva 240g Vitafor.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "VCEL30688",
+    "desc": "Collagen Protein Puravida Berries Silvestres",
+    "file": "VCEL30688 - Collagen Protein Puravida Berries Silvestres.txt",
+    "fornecedor": "PURAVIDA"
+  },
+  {
+    "code": "VIST29084",
+    "desc": "Whey Protein - Isoladado E Hidrolisado Dark Chocolate",
+    "file": "VIST29084 - Whey Protein - Isoladado E Hidrolisado Dark Chocolate.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "XCBD14180",
+    "desc": "Ocean Drop Zinco Quelato 60 Cápsulas Zinco Bisglicinato",
+    "file": "XCBD14180 - Ocean Drop Zinco Quelato 60 Cápsulas Zinco Bisglicinato No F.txt",
+    "fornecedor": "OCEAN DROP"
+  },
+  {
+    "code": "XMJQ33722",
+    "desc": "Vitafor Whey Isofort Premium 900g — FRUTAS VERMELHAS",
+    "file": "XMJQ33722 - Vitafor Whey Isofort Premium 900g Whey Isolada Pura Frutas V.txt",
+    "fornecedor": "VITAFOR"
+  },
+  {
+    "code": "YDDW81835",
+    "desc": "True Whey Protein Vegan",
+    "file": "YDDW81835 - True Whey Protein Vegan.txt",
+    "fornecedor": "TRUE SOURCE"
+  },
+  {
+    "code": "YHYO13692",
+    "desc": "Ocean Drop Trio Magnésio 60 Cápsulas Alta Concentração",
+    "file": "YHYO13692 - Ocean Drop Trio Magnésio 60 Cápsulas Alta Concentraçã.txt",
+    "fornecedor": "OCEAN DROP"
+  },
+  {
+    "code": "ZRTB80652",
+    "desc": "True Creatine 100% Pure True Source 300g",
+    "file": "ZRTB80652 - True Creatine 100% Pure True Source 300g Sem Sabor.txt",
+    "fornecedor": "TRUE SOURCE"
   }
 ]
