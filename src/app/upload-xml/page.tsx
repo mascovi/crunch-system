@@ -129,6 +129,22 @@ export default function UploadXMLPage() {
       // Salvar NF e itens no banco
       await salvarNotaFiscal(parsedNF, xmlUrl)
 
+      // Notificar no Telegram (fire-and-forget, não bloqueia o fluxo)
+      fetch('/api/notify/nova-nf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numero_nf: parsedNF.numero_nf,
+          fornecedor: parsedNF.fornecedor,
+          transportadora: parsedNF.transportadora || '',
+          volumes: parsedNF.volumes || 0,
+          itens: parsedNF.itens.map((it) => ({
+            produto: it.produto,
+            quantidade: it.quantidade,
+          })),
+        }),
+      }).catch(() => {}) // silencioso — não pode falhar o upload
+
       setStep('success')
       recarregarHistorico()
     } catch (err) {

@@ -766,7 +766,7 @@ function TabEstoque() {
                     Produto<SortIcon col="produto" />
                   </th>
                   <th
-                    className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none"
+                    className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none min-w-[150px]"
                     onClick={() => handleSort('fornecedor')}
                   >
                     Fornecedor<SortIcon col="fornecedor" />
@@ -801,7 +801,7 @@ function TabEstoque() {
                       <td className="px-4 py-3 text-gray-700 max-w-[220px] font-medium">
                         <span className="block leading-tight text-sm">{item.produto}</span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span className="text-xs bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-gray-600">
                           {item.fornecedor_principal || '—'}
                         </span>
