@@ -129,21 +129,26 @@ export default function UploadXMLPage() {
       // Salvar NF e itens no banco
       await salvarNotaFiscal(parsedNF, xmlUrl)
 
-      // Notificar no Telegram (fire-and-forget, não bloqueia o fluxo)
-      fetch('/api/notify/nova-nf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          numero_nf: parsedNF.numero_nf,
-          fornecedor: parsedNF.fornecedor,
-          transportadora: parsedNF.transportadora || '',
-          volumes: parsedNF.volumes || 0,
-          itens: parsedNF.itens.map((it) => ({
-            produto: it.produto,
-            quantidade: it.quantidade,
-          })),
-        }),
-      }).catch(() => {}) // silencioso — não pode falhar o upload
+      // Notificar no Telegram (não bloqueia o fluxo principal)
+      try {
+        const notifyRes = await fetch('/api/notify/nova-nf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            numero_nf: parsedNF.numero_nf,
+            fornecedor: parsedNF.fornecedor,
+            transportadora: parsedNF.transportadora || '',
+            volumes: parsedNF.volumes || 0,
+            itens: parsedNF.itens.map((it) => ({
+              produto: it.produto,
+              quantidade: it.quantidade,
+            })),
+          }),
+        })
+        console.log('[Telegram] Notificação:', notifyRes.status, notifyRes.ok ? 'OK' : 'ERRO')
+      } catch (notifyErr) {
+        console.error('[Telegram] Falha ao notificar:', notifyErr)
+      }
 
       setStep('success')
       recarregarHistorico()
