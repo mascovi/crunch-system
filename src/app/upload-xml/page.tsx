@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { parseNFeXML, validarCodigosML } from '@/lib/xml-parser'
-import { verificarNFDuplicada, salvarNotaFiscal } from '@/services/notas-fiscais'
+import { verificarNFDuplicada } from '@/services/notas-fiscais'
 import { supabase } from '@/lib/supabase'
 import type { XMLParsedNF, NotaFiscal } from '@/types'
 
@@ -126,28 +126,15 @@ export default function UploadXMLPage() {
         xmlUrl = urlData.publicUrl
       }
 
-      // Salvar NF e itens no banco
-      await salvarNotaFiscal(parsedNF, xmlUrl)
-
-      // Notificar no Telegram (não bloqueia o fluxo principal)
-      try {
-        const notifyRes = await fetch('/api/notify/nova-nf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            numero_nf: parsedNF.numero_nf,
-            fornecedor: parsedNF.fornecedor,
-            transportadora: parsedNF.transportadora || '',
-            volumes: parsedNF.volumes || 0,
-            itens: parsedNF.itens.map((it) => ({
-              produto: it.produto,
-              quantidade: it.quantidade,
-            })),
-          }),
-        })
-        console.log('[Telegram] Notificação:', notifyRes.status, notifyRes.ok ? 'OK' : 'ERRO')
-      } catch (notifyErr) {
-        console.error('[Telegram] Falha ao notificar:', notifyErr)
+      // Salvar NF + notificar Telegram (tudo server-side, numa chamada só)
+      const salvarRes = await fetch('/api/notas-fiscais/salvar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parsedNF, xmlUrl }),
+      })
+      const salvarData = await salvarRes.json()
+      if (!salvarRes.ok) {
+        throw new Error(salvarData.error || 'Erro ao salvar nota fiscal.')
       }
 
       setStep('success')
