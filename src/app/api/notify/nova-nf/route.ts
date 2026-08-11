@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const enviado = await notificarNovaNF({
+    const resultado = await notificarNovaNF({
       numero_nf,
       fornecedor,
       transportadora: transportadora || '',
@@ -28,9 +28,11 @@ export async function POST(req: NextRequest) {
       itens: itens || [],
     })
 
-    return NextResponse.json({ ok: enviado })
+    // Devolve o motivo da falha para aparecer na tela — nada de erro silencioso
+    return NextResponse.json({ ok: resultado.ok, error: resultado.error })
   } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erro interno'
     console.error('[notify/nova-nf] Erro:', err)
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 }

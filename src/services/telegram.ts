@@ -12,19 +12,33 @@ const CHAT_ID = process.env.TELEGRAM_CHAT_ID || ''
 interface TelegramResult {
   ok: boolean
   description?: string
+  error_code?: number
+}
+
+/** Resultado detalhado do envio — carrega o motivo em caso de falha. */
+export interface EnvioResult {
+  ok: boolean
+  error?: string
 }
 
 /**
  * Envia uma mensagem de texto via Telegram Bot API.
- * Suporta HTML parse_mode para formatação (negrito, itálico, links).
+ * Retorna o motivo da falha em vez de falhar em silêncio.
  */
-export async function enviarMensagemTelegram(
+export async function enviarMensagemTelegramDetalhado(
   texto: string,
   parseMode: 'HTML' | 'MarkdownV2' = 'HTML'
-): Promise<boolean> {
+): Promise<EnvioResult> {
   if (!BOT_TOKEN || !CHAT_ID) {
-    console.warn('[Telegram] BOT_TOKEN ou CHAT_ID não configurados. Notificação ignorada.')
-    return false
+    const faltando = [
+      !BOT_TOKEN && 'TELEGRAM_BOT_TOKEN',
+      !CHAT_ID && 'TELEGRAM_CHAT_ID',
+    ]
+      .filter(Boolean)
+      .join(' e ')
+    const msg = `Variavel de ambiente ausente: ${faltando}`
+    console.warn('[Telegram]', msg)
+    return { ok: false, error: msg }
   }
 
   try {
@@ -42,15 +56,28 @@ export async function enviarMensagemTelegram(
     const result: TelegramResult = await res.json()
 
     if (!result.ok) {
-      console.error('[Telegram] Erro ao enviar:', result.description)
-      return false
+      const msg = `Telegram recusou (${result.error_code}): ${result.description}`
+      console.error('[Telegram]', msg)
+      return { ok: false, error: msg }
     }
 
-    return true
+    return { ok: true }
   } catch (err) {
-    console.error('[Telegram] Erro de rede:', err)
-    return false
+    const msg = `Erro de rede: ${err instanceof Error ? err.message : String(err)}`
+    console.error('[Telegram]', msg)
+    return { ok: false, error: msg }
   }
+}
+
+/**
+ * Wrapper booleano — mantido para os chamadores que só precisam de sim/nao.
+ */
+export async function enviarMensagemTelegram(
+  texto: string,
+  parseMode: 'HTML' | 'MarkdownV2' = 'HTML'
+): Promise<boolean> {
+  const r = await enviarMensagemTelegramDetalhado(texto, parseMode)
+  return r.ok
 }
 
 /**
@@ -62,7 +89,7 @@ export async function notificarNovaNF(dados: {
   transportadora: string
   volumes: number
   itens: { produto: string; quantidade: number }[]
-}): Promise<boolean> {
+}): Promise<EnvioResult> {
   const listaItens = dados.itens
     .map((it) => `  • ${it.produto} (×${it.quantidade})`)
     .join('\n')
@@ -79,7 +106,7 @@ export async function notificarNovaNF(dados: {
     listaItens,
   ].join('\n')
 
-  return enviarMensagemTelegram(msg)
+  return enviarMensagemTelegramDetalhado(msg)
 }
 
 /**

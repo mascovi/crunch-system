@@ -19,6 +19,7 @@ export default function UploadXMLPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [telegramOk, setTelegramOk] = useState<boolean | null>(null)
+  const [telegramErro, setTelegramErro] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Histórico de NFs
@@ -127,10 +128,12 @@ export default function UploadXMLPage() {
       })
       const data = await res.json()
       console.log('[Telegram] Gatilho do botão:', res.status, data)
-      return res.ok && data.ok === true
+      if (data.ok === true) return { ok: true, erro: '' }
+      return { ok: false, erro: data.error || `HTTP ${res.status}` }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
       console.error('[Telegram] Gatilho do botão falhou:', e)
-      return false
+      return { ok: false, erro: `Falha na chamada: ${msg}` }
     }
   }
 
@@ -141,9 +144,10 @@ export default function UploadXMLPage() {
     setErrors([])
 
     // 1) GATILHO: notifica o Telegram imediatamente no clique do botão
-    const telegramEnviado = await dispararTelegram(parsedNF)
-    setTelegramOk(telegramEnviado)
-    console.log('[handleConfirmar] Telegram enviado?', telegramEnviado)
+    const resTelegram = await dispararTelegram(parsedNF)
+    setTelegramOk(resTelegram.ok)
+    setTelegramErro(resTelegram.erro)
+    console.log('[handleConfirmar] Telegram:', resTelegram)
 
     try {
       // Upload do XML para Supabase Storage
@@ -194,6 +198,7 @@ export default function UploadXMLPage() {
     setErrors([])
     setWarnings([])
     setTelegramOk(null)
+    setTelegramErro('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -380,16 +385,23 @@ export default function UploadXMLPage() {
           {/* Status do gatilho de notificação Telegram */}
           {telegramOk !== null && (
             <div
-              className={`inline-flex items-center gap-2 px-4 py-2 mb-8 rounded-lg text-xs font-medium border ${
+              className={`inline-block px-4 py-3 mb-8 rounded-lg text-xs border max-w-xl text-left ${
                 telegramOk
                   ? 'border-green-500/40 bg-green-500/10 text-green-400'
                   : 'border-amber-500/40 bg-amber-500/10 text-amber-400'
               }`}
             >
-              <span>{telegramOk ? '✓' : '⚠'}</span>
-              {telegramOk
-                ? 'Notificação enviada no Telegram'
-                : 'Não foi possível enviar a notificação no Telegram'}
+              <div className="font-medium">
+                {telegramOk ? '✓' : '⚠'}{' '}
+                {telegramOk
+                  ? 'Notificação enviada no Telegram'
+                  : 'Não foi possível enviar a notificação no Telegram'}
+              </div>
+              {!telegramOk && telegramErro && (
+                <div className="mt-2 font-mono text-[11px] leading-relaxed opacity-90 break-words">
+                  {telegramErro}
+                </div>
+              )}
             </div>
           )}
 
