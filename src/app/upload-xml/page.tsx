@@ -18,6 +18,7 @@ export default function UploadXMLPage() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [telegramOk, setTelegramOk] = useState<boolean | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Histórico de NFs
@@ -103,10 +104,46 @@ export default function UploadXMLPage() {
     }
   }
 
+  /**
+   * GATILHO DIRETO DO BOTÃO — dispara a notificação Telegram no clique.
+   * Usa /api/notify/nova-nf (endpoint isolado e testado).
+   * Roda independente do salvamento: se o save falhar, a mensagem sai do mesmo jeito.
+   */
+  const dispararTelegram = async (nf: XMLParsedNF) => {
+    try {
+      const res = await fetch('/api/notify/nova-nf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numero_nf: nf.numero_nf,
+          fornecedor: nf.fornecedor,
+          transportadora: nf.transportadora || '',
+          volumes: nf.volumes || 0,
+          itens: (nf.itens || []).map((it) => ({
+            produto: it.produto,
+            quantidade: it.quantidade,
+          })),
+        }),
+      })
+      const data = await res.json()
+      console.log('[Telegram] Gatilho do botão:', res.status, data)
+      return res.ok && data.ok === true
+    } catch (e) {
+      console.error('[Telegram] Gatilho do botão falhou:', e)
+      return false
+    }
+  }
+
   const handleConfirmar = async () => {
+    console.log('[handleConfirmar] Iniciando...', { hasParsedNF: !!parsedNF, hasXml: !!xmlContent })
     if (!parsedNF || !xmlContent) return
     setSaving(true)
     setErrors([])
+
+    // 1) GATILHO: notifica o Telegram imediatamente no clique do botão
+    const telegramEnviado = await dispararTelegram(parsedNF)
+    setTelegramOk(telegramEnviado)
+    console.log('[handleConfirmar] Telegram enviado?', telegramEnviado)
 
     try {
       // Upload do XML para Supabase Storage
@@ -126,13 +163,15 @@ export default function UploadXMLPage() {
         xmlUrl = urlData.publicUrl
       }
 
-      // Salvar NF + notificar Telegram (tudo server-side, numa chamada só)
+      // 2) Salvar NF no banco (server-side)
+      console.log('[handleConfirmar] Chamando /api/notas-fiscais/salvar...', { numero_nf: parsedNF.numero_nf })
       const salvarRes = await fetch('/api/notas-fiscais/salvar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parsedNF, xmlUrl }),
       })
       const salvarData = await salvarRes.json()
+      console.log('[handleConfirmar] Resposta:', { status: salvarRes.status, data: salvarData })
       if (!salvarRes.ok) {
         throw new Error(salvarData.error || 'Erro ao salvar nota fiscal.')
       }
@@ -140,6 +179,7 @@ export default function UploadXMLPage() {
       setStep('success')
       recarregarHistorico()
     } catch (err) {
+      console.error('[handleConfirmar] ERRO:', err)
       setErrors([err instanceof Error ? err.message : 'Erro ao salvar nota fiscal.'])
     } finally {
       setSaving(false)
@@ -153,6 +193,7 @@ export default function UploadXMLPage() {
     setParsedNF(null)
     setErrors([])
     setWarnings([])
+    setTelegramOk(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -332,9 +373,26 @@ export default function UploadXMLPage() {
         <div className="bg-crunch-panel border border-crunch-line rounded-2xl p-12 text-center animate-fade-in-up">
           <div className="text-4xl mb-4 text-green-400">&#10003;</div>
           <h2 className="text-xl font-semibold mb-2">Nota fiscal enviada com sucesso</h2>
-          <p className="text-sm text-crunch-ink-dim mb-8">
+          <p className="text-sm text-crunch-ink-dim mb-4">
             A NF foi adicionada ao painel de trânsito. O estoque será atualizado quando o recebimento for confirmado.
           </p>
+
+          {/* Status do gatilho de notificação Telegram */}
+          {telegramOk !== null && (
+            <div
+              className={`inline-flex items-center gap-2 px-4 py-2 mb-8 rounded-lg text-xs font-medium border ${
+                telegramOk
+                  ? 'border-green-500/40 bg-green-500/10 text-green-400'
+                  : 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+              }`}
+            >
+              <span>{telegramOk ? '✓' : '⚠'}</span>
+              {telegramOk
+                ? 'Notificação enviada no Telegram'
+                : 'Não foi possível enviar a notificação no Telegram'}
+            </div>
+          )}
+
           <div className="flex gap-4 justify-center">
             <button
               onClick={handleReset}
