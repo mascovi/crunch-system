@@ -1,11 +1,32 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import NotasEmTransito from '@/components/NotasEmTransito'
 import { useAuth } from '@/contexts/AuthContext'
 
+const CNPJ_CRUNCH = '50.288.627/0001-68'
+
 export default function HubPage() {
   const { usuario, logout } = useAuth()
+  const [copiado, setCopiado] = useState(false)
+
+  const copiarCNPJ = async () => {
+    try {
+      await navigator.clipboard.writeText(CNPJ_CRUNCH)
+    } catch {
+      // Fallback para navegadores sem permissão de clipboard
+      const el = document.createElement('textarea')
+      el.value = CNPJ_CRUNCH
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2000)
+  }
+
   return (
     <div className="max-w-[1080px] mx-auto px-8 py-20">
       {/* ============================================ */}
@@ -25,6 +46,26 @@ export default function HubPage() {
             <p className="mt-2 text-crunch-ink-dim text-sm">
               Hub operacional — recebimento, estoque e FULL.
             </p>
+            {/* CNPJ sempre à mão — clique para copiar */}
+            <button
+              onClick={copiarCNPJ}
+              title="Clique para copiar o CNPJ"
+              className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border border-crunch-line bg-crunch-panel hover:border-crunch-accent hover:bg-crunch-panel-2 transition-colors group"
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-crunch-ink-mute">
+                CNPJ
+              </span>
+              <span className="font-mono text-xs text-crunch-ink-dim group-hover:text-crunch-ink">
+                {CNPJ_CRUNCH}
+              </span>
+              <span
+                className={`text-[10px] font-semibold ${
+                  copiado ? 'text-green-400' : 'text-crunch-ink-mute'
+                }`}
+              >
+                {copiado ? 'copiado' : 'copiar'}
+              </span>
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-6">
