@@ -4,8 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import type { NotaEmTransito, ItemNF } from '@/types'
 import { listarNotasEmTransito, buscarItensNF, confirmarRecebimento } from '@/services/notas-fiscais'
 import { buscarEstatisticasEntrega } from '@/services/entregas'
+import { acharTransportadora } from '@/lib/rastreio'
 import ConfirmModal from './ConfirmModal'
 import XmlViewer from './XmlViewer'
+
+/** CNPJ da Crunch — usado nas consultas de rastreio */
+const CNPJ_CRUNCH = '50.288.627/0001-68'
 
 export default function NotasEmTransito() {
   const [notas, setNotas] = useState<NotaEmTransito[]>([])
@@ -23,6 +27,9 @@ export default function NotasEmTransito() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmNota, setConfirmNota] = useState<NotaEmTransito | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
+
+  // Aviso flutuante do rastreio
+  const [avisoRastreio, setAvisoRastreio] = useState('')
 
   const carregarNotas = useCallback(async () => {
     try {
@@ -83,6 +90,32 @@ export default function NotasEmTransito() {
     } finally {
       setConfirmLoading(false)
     }
+  }
+
+  /**
+   * Abre a pagina de rastreio da transportadora com o CNPJ ja copiado.
+   * O numero da NF vai no aviso, pronto para digitar.
+   */
+  const handleRastrear = async (nota: NotaEmTransito) => {
+    const transp = acharTransportadora(nota.transportadora)
+    if (!transp) return
+
+    try {
+      await navigator.clipboard.writeText(CNPJ_CRUNCH)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = CNPJ_CRUNCH
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+
+    window.open(transp.url, '_blank', 'noopener,noreferrer')
+    setAvisoRastreio(
+      `CNPJ copiado. Na ${transp.nome}: ${transp.instrucao} Numero da NF: ${nota.numero_nf}`
+    )
+    setTimeout(() => setAvisoRastreio(''), 12000)
   }
 
   const formatDate = (dateStr: string) => {
@@ -146,6 +179,13 @@ export default function NotasEmTransito() {
           </div>
         )}
 
+        {avisoRastreio && (
+          <div className="px-6 py-3 bg-blue-900/20 text-blue-300 text-xs border-b border-crunch-line flex items-start gap-2">
+            <span className="mt-px">&#8505;</span>
+            <span>{avisoRastreio}</span>
+          </div>
+        )}
+
         {notas.length === 0 ? (
           <div className="px-6 py-12 text-center text-crunch-ink-mute text-sm">
             Nenhuma nota fiscal em transito.
@@ -182,6 +222,15 @@ export default function NotasEmTransito() {
                     {renderPrevisao(nota)}
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-center gap-2">
+                        {acharTransportadora(nota.transportadora) && (
+                          <button
+                            onClick={() => handleRastrear(nota)}
+                            title={`Abrir rastreio da ${acharTransportadora(nota.transportadora)?.nome} com o CNPJ copiado`}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:text-blue-400 hover:border-blue-400 transition-colors"
+                          >
+                            Rastrear
+                          </button>
+                        )}
                         <button
                           onClick={() => handleVisualizar(nota)}
                           className="px-3 py-1.5 text-xs font-medium rounded-lg border border-crunch-line text-crunch-ink-dim hover:text-crunch-accent hover:border-crunch-accent transition-colors"
