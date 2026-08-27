@@ -6,6 +6,7 @@ import Papa from 'papaparse'
 import { listarEstoque, ajustarEstoque, cadastrarProduto, buscarHistoricoCodigo, atualizarProduto } from '@/services/estoque'
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
 import { supabase } from '@/lib/supabase'
+import { montarZplParaImpressao } from '@/lib/zpl'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao, Fornecedor } from '@/types'
 import { listarFornecedoresCompleto, atualizarFornecedor, buscarNFsPorFornecedor } from '@/services/fornecedores'
 import { buscarEstatisticasEntrega, buscarNFsComEstimativa } from '@/services/entregas'
@@ -552,13 +553,20 @@ function TabEstoque() {
         return
       }
 
-      // Injetar quantidade: ^PQ antes de ^XZ
-      let zpl = etiqueta.zpl
-      zpl = zpl.replace(/\^XZ/g, `^PQ${qtd},0,0,Y\n^XZ`)
+      // Repetir o bloco ^XA...^XZ em vez de usar ^PQ — evita a deriva
+      // horizontal que cortava as ultimas etiquetas do lote.
+      const resultado = montarZplParaImpressao(etiqueta.zpl, qtd)
 
       // Copiar para clipboard
-      await navigator.clipboard.writeText(zpl)
-      setPrintSuccess(`ZPL copiado! ${qtd} etiqueta(s) de "${etiqueta.desc}" prontas para impressão.`)
+      await navigator.clipboard.writeText(resultado.zpl)
+
+      const aviso =
+        resultado.etiquetasGeradas !== qtd
+          ? ` Como o template traz ${resultado.etiquetasPorBloco} etiquetas por bloco, serão impressas ${resultado.etiquetasGeradas}.`
+          : ''
+      setPrintSuccess(
+        `ZPL copiado! ${resultado.etiquetasGeradas} etiqueta(s) de "${etiqueta.desc}" prontas para impressão.${aviso}`
+      )
     } catch (err) {
       setPrintError(err instanceof Error ? err.message : 'Erro ao gerar ZPL.')
     } finally {
