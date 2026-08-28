@@ -6,8 +6,23 @@
  *   TELEGRAM_CHAT_ID    — chat_id do destinatário (pessoa ou grupo)
  */
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID || ''
+/**
+ * Le as credenciais NA HORA DA CHAMADA — nunca no escopo do modulo.
+ *
+ * POR QUE ISSO IMPORTA:
+ * Antes isso era `const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN` no topo do
+ * arquivo. Constante de modulo e avaliada uma unica vez, quando o modulo e
+ * carregado — e o Next.js pode congelar esse valor vazio em alguns chunks.
+ * O resultado foi um bug em que o cron enxergava as variaveis e a rota de
+ * salvar NF nao, com o mesmo codigo e o mesmo deployment. Lendo dentro da
+ * funcao, o valor vem sempre do ambiente vivo da execucao.
+ */
+function lerCredenciais() {
+  return {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    chatId: process.env.TELEGRAM_CHAT_ID || '',
+  }
+}
 
 interface TelegramResult {
   ok: boolean
@@ -29,10 +44,12 @@ export async function enviarMensagemTelegramDetalhado(
   texto: string,
   parseMode: 'HTML' | 'MarkdownV2' = 'HTML'
 ): Promise<EnvioResult> {
-  if (!BOT_TOKEN || !CHAT_ID) {
+  const { botToken, chatId } = lerCredenciais()
+
+  if (!botToken || !chatId) {
     const faltando = [
-      !BOT_TOKEN && 'TELEGRAM_BOT_TOKEN',
-      !CHAT_ID && 'TELEGRAM_CHAT_ID',
+      !botToken && 'TELEGRAM_BOT_TOKEN',
+      !chatId && 'TELEGRAM_CHAT_ID',
     ]
       .filter(Boolean)
       .join(' e ')
@@ -42,12 +59,12 @@ export async function enviarMensagemTelegramDetalhado(
   }
 
   try {
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: CHAT_ID,
+        chat_id: chatId,
         text: texto,
         parse_mode: parseMode,
       }),
