@@ -106,48 +106,18 @@ export default function UploadXMLPage() {
   }
 
   /**
-   * GATILHO DIRETO DO BOTÃO — dispara a notificação Telegram no clique.
-   * Usa /api/notify/nova-nf (endpoint isolado e testado).
-   * Roda independente do salvamento: se o save falhar, a mensagem sai do mesmo jeito.
+   * A notificação Telegram NÃO é disparada aqui no navegador.
+   * Ela roda dentro de /api/notas-fiscais/salvar, no servidor — assim não
+   * depende de cache do browser, aba antiga nem erro de JavaScript.
+   * Esta tela apenas exibe o resultado que o servidor devolve.
    */
-  const dispararTelegram = async (nf: XMLParsedNF) => {
-    try {
-      const res = await fetch('/api/notify/nova-nf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          numero_nf: nf.numero_nf,
-          fornecedor: nf.fornecedor,
-          transportadora: nf.transportadora || '',
-          volumes: nf.volumes || 0,
-          itens: (nf.itens || []).map((it) => ({
-            produto: it.produto,
-            quantidade: it.quantidade,
-          })),
-        }),
-      })
-      const data = await res.json()
-      console.log('[Telegram] Gatilho do botão:', res.status, data)
-      if (data.ok === true) return { ok: true, erro: '' }
-      return { ok: false, erro: data.error || `HTTP ${res.status}` }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error('[Telegram] Gatilho do botão falhou:', e)
-      return { ok: false, erro: `Falha na chamada: ${msg}` }
-    }
-  }
-
   const handleConfirmar = async () => {
     console.log('[handleConfirmar] Iniciando...', { hasParsedNF: !!parsedNF, hasXml: !!xmlContent })
     if (!parsedNF || !xmlContent) return
     setSaving(true)
     setErrors([])
-
-    // 1) GATILHO: notifica o Telegram imediatamente no clique do botão
-    const resTelegram = await dispararTelegram(parsedNF)
-    setTelegramOk(resTelegram.ok)
-    setTelegramErro(resTelegram.erro)
-    console.log('[handleConfirmar] Telegram:', resTelegram)
+    setTelegramOk(null)
+    setTelegramErro('')
 
     try {
       // Upload do XML para Supabase Storage
@@ -179,6 +149,10 @@ export default function UploadXMLPage() {
       if (!salvarRes.ok) {
         throw new Error(salvarData.error || 'Erro ao salvar nota fiscal.')
       }
+
+      // Resultado da notificação, decidido no servidor
+      setTelegramOk(salvarData.telegramOk === true)
+      setTelegramErro(salvarData.telegramErro || '')
 
       setStep('success')
       recarregarHistorico()
