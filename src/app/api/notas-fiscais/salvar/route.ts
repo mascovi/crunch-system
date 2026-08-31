@@ -55,7 +55,11 @@ export async function POST(req: NextRequest) {
       console.error('[salvar-nf] Falha ao notificar:', notifyErr)
     }
 
-    return NextResponse.json({ ok: true, nf, telegramOk, telegramErro })
+    // Carimbo do build que respondeu. Serve para saber, olhando a tela, se a
+    // requisicao caiu num deployment antigo (URL fixada, cache, preview).
+    const deploy = (process.env.VERCEL_GIT_COMMIT_SHA || 'local').substring(0, 7)
+
+    return NextResponse.json({ ok: true, nf, telegramOk, telegramErro, deploy })
   } catch (err) {
     console.error('[salvar-nf] Erro:', err)
     return NextResponse.json(

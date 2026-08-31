@@ -7,6 +7,7 @@ import { listarEstoque, ajustarEstoque, cadastrarProduto, buscarHistoricoCodigo,
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
 import { supabase } from '@/lib/supabase'
 import { montarZplParaImpressao } from '@/lib/zpl'
+import TabPrepararFull from '@/components/TabPrepararFull'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao, Fornecedor } from '@/types'
 import { listarFornecedoresCompleto, atualizarFornecedor, buscarNFsPorFornecedor } from '@/services/fornecedores'
 import { buscarEstatisticasEntrega, buscarNFsComEstimativa } from '@/services/entregas'
@@ -23,7 +24,7 @@ import {
   PieLabelRenderProps,
 } from 'recharts'
 
-type Tab = 'estoque' | 'enviar-full' | 'historico' | 'entregas'
+type Tab = 'estoque' | 'preparar-full' | 'enviar-full' | 'historico' | 'entregas'
 
 const MOTIVOS: { value: MotivoAjuste; label: string }[] = [
   { value: 'DEVOLUCAO', label: 'Devolução' },
@@ -62,6 +63,7 @@ export default function EstoquePage() {
         <div className="flex gap-1 mb-6 bg-white rounded-xl p-1 border border-gray-200 w-fit shadow-sm">
           {[
             { id: 'estoque' as Tab, label: 'Estoque' },
+            { id: 'preparar-full' as Tab, label: 'Preparar FULL' },
             { id: 'enviar-full' as Tab, label: 'Enviar FULL' },
             { id: 'historico' as Tab, label: 'Histórico FULL' },
             { id: 'entregas' as Tab, label: 'Estimativa Entrega' },
@@ -81,6 +83,7 @@ export default function EstoquePage() {
         </div>
 
         {tab === 'estoque' && <TabEstoque />}
+        {tab === 'preparar-full' && <TabPrepararFull />}
         {tab === 'enviar-full' && <TabEnviarFull />}
         {tab === 'historico' && <TabHistorico />}
         {tab === 'entregas' && <TabEntregas />}

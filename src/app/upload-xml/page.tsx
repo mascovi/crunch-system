@@ -152,7 +152,11 @@ export default function UploadXMLPage() {
 
       // Resultado da notificação, decidido no servidor
       setTelegramOk(salvarData.telegramOk === true)
-      setTelegramErro(salvarData.telegramErro || '')
+      setTelegramErro(
+        salvarData.telegramErro
+          ? `${salvarData.telegramErro} [build ${salvarData.deploy || '?'}]`
+          : ''
+      )
 
       setStep('success')
       recarregarHistorico()
