@@ -130,7 +130,9 @@ export function extrairFull(texto: string): ResultadoFull {
     }
   }
 
-  const finais = [...mapa.values()]
+  // Array.from em vez de spread: o target do projeto nao permite iterar
+  // um Map com spread sem a flag downlevelIteration.
+  const finais = Array.from(mapa.values())
   return {
     itens: finais,
     avisos,
