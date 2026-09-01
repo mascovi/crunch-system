@@ -7,6 +7,7 @@ import { listarEstoque, ajustarEstoque, cadastrarProduto, buscarHistoricoCodigo,
 import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
 import { supabase } from '@/lib/supabase'
 import { montarZplParaImpressao } from '@/lib/zpl'
+import { lerEtiquetaML, ehCodigoML } from '@/lib/etiqueta-ml'
 import TabPrepararFull from '@/components/TabPrepararFull'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao, Fornecedor } from '@/types'
 import { listarFornecedoresCompleto, atualizarFornecedor, buscarNFsPorFornecedor } from '@/services/fornecedores'
@@ -122,6 +123,12 @@ function TabEstoque() {
   const [editLoading, setEditLoading] = useState(false)
   const [editError, setEditError] = useState('')
   const [editSuccess, setEditSuccess] = useState('')
+  // Puxar da etiqueta
+  const [puxarAberto, setPuxarAberto] = useState(false)
+  const [puxarTexto, setPuxarTexto] = useState('')
+  const [puxarErro, setPuxarErro] = useState('')
+  const [puxarOk, setPuxarOk] = useState('')
+  const [editZpl, setEditZpl] = useState('')
 
   // Modal Novo Produto
   const [novoProdOpen, setNovoProdOpen] = useState(false)
@@ -300,12 +307,46 @@ function TabEstoque() {
     setEditCodigoFornecedor('')
     setEditError('')
     setEditSuccess('')
+    // Zerar o estado do "puxar da etiqueta" para não vazar entre produtos
+    setPuxarAberto(false)
+    setPuxarTexto('')
+    setPuxarErro('')
+    setPuxarOk('')
+    setEditZpl('')
     // Buscar SKU atual
     supabase.from('produtos').select('codigo_fornecedor').eq('codigo_ml', item.codigo_ml).limit(1)
       .then(({ data }) => {
         if (data && data[0]) setEditCodigoFornecedor(data[0].codigo_fornecedor || '')
       })
     setEditOpen(true)
+  }
+
+  /**
+   * Lê a etiqueta colada e preenche os campos do formulário.
+   *
+   * O campo "SKU:" da etiqueta é deliberadamente ignorado — ele NÃO é o
+   * código do fornecedor (conferimos: coincide em alguns produtos e diverge
+   * em outros). O SKU Fornecedor continua vindo do XML e do preenchimento
+   * manual, nunca da etiqueta.
+   */
+  const handlePuxarDaEtiqueta = () => {
+    setPuxarErro('')
+    setPuxarOk('')
+    try {
+      const dados = lerEtiquetaML(puxarTexto)
+      setEditCodigoMl(dados.codigoMl)
+      setEditDescricao(dados.descricao)
+      if (dados.fornecedor) setEditFornecedor(dados.fornecedor)
+      setEditZpl(dados.zpl)
+      setPuxarOk(
+        `Etiqueta lida: ${dados.codigoMl}. Confira os campos e salve.` +
+          (dados.fornecedor ? '' : ' Não identifiquei a marca — escolha o fornecedor.')
+      )
+      setPuxarTexto('')
+      setPuxarAberto(false)
+    } catch (e) {
+      setPuxarErro(e instanceof Error ? e.message : 'Não consegui ler a etiqueta.')
+    }
   }
 
   const handleEditCadastro = async () => {
@@ -323,8 +364,10 @@ function TabEstoque() {
         descricao: editDescricao.trim(),
         fornecedor: editFornecedor.trim(),
         codigo_fornecedor: editCodigoFornecedor.trim(),
+        // Só grava a etiqueta quando ela foi puxada nesta edição
+        ...(editZpl ? { zpl: editZpl } : {}),
       })
-      setEditSuccess('Cadastro atualizado!')
+      setEditSuccess(editZpl ? 'Cadastro e etiqueta atualizados!' : 'Cadastro atualizado!')
       await carregarEstoque()
       setTimeout(() => {
         setEditOpen(false)
@@ -524,20 +567,35 @@ function TabEstoque() {
     setPrintError('')
     setPrintSuccess('')
     try {
+      // Buscar no Supabase: etiqueta salva pelo "Puxar da etiqueta" e o SKU
+      const { data: prodData } = await supabase
+        .from('produtos')
+        .select('codigo_fornecedor, zpl')
+        .eq('codigo_ml', printItem.codigo_ml)
+        .limit(1)
+      const codigoFornecedor = prodData?.[0]?.codigo_fornecedor
+      const zplDoBanco: string | null = prodData?.[0]?.zpl || null
+
+      // A etiqueta salva no banco tem prioridade sobre o arquivo estático
+      if (zplDoBanco) {
+        const r = montarZplParaImpressao(zplDoBanco, qtd)
+        await navigator.clipboard.writeText(r.zpl)
+        const obs =
+          r.etiquetasGeradas !== qtd
+            ? ` Como o template traz ${r.etiquetasPorBloco} etiquetas por bloco, serão impressas ${r.etiquetasGeradas}.`
+            : ''
+        setPrintSuccess(
+          `ZPL copiado! ${r.etiquetasGeradas} etiqueta(s) de "${printItem.produto}" prontas para impressão.${obs}`
+        )
+        return
+      }
+
       // Carregar etiquetas (cache para não buscar toda vez)
       if (!etiquetasCache.current) {
         const res = await fetch('/etiquetas/etiquetas-prontas.json')
         if (!res.ok) throw new Error('Erro ao carregar base de etiquetas.')
         etiquetasCache.current = await res.json()
       }
-
-      // Buscar codigo_fornecedor no Supabase
-      const { data: prodData } = await supabase
-        .from('produtos')
-        .select('codigo_fornecedor')
-        .eq('codigo_ml', printItem.codigo_ml)
-        .limit(1)
-      const codigoFornecedor = prodData?.[0]?.codigo_fornecedor
 
       // Tentar match por codigo_fornecedor, depois por codigo_ml
       let etiqueta = etiquetasCache.current?.find(
@@ -802,15 +860,39 @@ function TabEstoque() {
               <tbody>
                 {filtrado.map((item) => {
                   const badge = getStockBadge(item.quantidade_disponivel)
+                  // Código que não tem formato ML veio do XML como código do
+                  // fornecedor — o produto ainda precisa do código ML de verdade.
+                  const semCodigoML = !ehCodigoML(item.codigo_ml)
                   return (
-                    <tr key={item.codigo_ml} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
+                    <tr
+                      key={item.codigo_ml}
+                      className={`border-b transition-colors ${
+                        semCodigoML
+                          ? 'border-red-200 bg-red-50 hover:bg-red-100/70'
+                          : 'border-gray-100 hover:bg-gray-50/60'
+                      }`}
+                    >
                       <td className="px-5 py-3">
-                        <span className="font-mono text-xs bg-orange-50 text-[#ff6a00] border border-orange-200 px-2 py-0.5 rounded font-medium">
-                          {item.codigo_ml}
-                        </span>
+                        {semCodigoML ? (
+                          <span
+                            title={`Este produto entrou pelo XML com o código do fornecedor "${item.codigo_ml}". Edite o cadastro e informe o código ML.`}
+                            className="font-mono text-xs bg-red-600 text-white px-2 py-0.5 rounded font-semibold"
+                          >
+                            CADASTRAR
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs bg-orange-50 text-[#ff6a00] border border-orange-200 px-2 py-0.5 rounded font-medium">
+                            {item.codigo_ml}
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-gray-700 max-w-[220px] font-medium">
+                      <td className={`px-4 py-3 max-w-[220px] font-medium ${semCodigoML ? 'text-red-800' : 'text-gray-700'}`}>
                         <span className="block leading-tight text-sm">{item.produto}</span>
+                        {semCodigoML && (
+                          <span className="block text-[11px] text-red-600 mt-0.5 font-mono">
+                            código atual: {item.codigo_ml}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="text-xs bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-gray-600">
@@ -1020,6 +1102,70 @@ function TabEstoque() {
             {editSuccess && (
               <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-600">{editSuccess}</div>
             )}
+
+            {/* ---- Puxar da etiqueta ---- */}
+            <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              {!puxarAberto ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Puxar da etiqueta</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Cole a etiqueta do ML e o sistema preenche os campos sozinho.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setPuxarAberto(true); setPuxarErro(''); setPuxarOk('') }}
+                    className="shrink-0 px-4 py-2 text-xs font-semibold rounded-lg border border-[#ff6a00] text-[#ff6a00] hover:bg-[#ff6a00] hover:text-white transition-colors"
+                  >
+                    Puxar da etiqueta
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">
+                    Cole aqui a etiqueta ZPL
+                  </label>
+                  <textarea
+                    value={puxarTexto}
+                    onChange={(e) => setPuxarTexto(e.target.value)}
+                    rows={5}
+                    placeholder={'^XA^CI28\n^LH0,0\n^FO30,15^BY2,,0^BCN,54,N,N^FD...'}
+                    className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-[11px] text-gray-800 focus:outline-none focus:border-[#ff6a00] focus:ring-1 focus:ring-[#ff6a00]"
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={handlePuxarDaEtiqueta}
+                      disabled={!puxarTexto.trim()}
+                      className="px-4 py-2 text-xs font-semibold rounded-lg bg-[#ff6a00] text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                    >
+                      Ler etiqueta
+                    </button>
+                    <button
+                      onClick={() => { setPuxarAberto(false); setPuxarTexto(''); setPuxarErro('') }}
+                      className="px-4 py-2 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-white transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {puxarErro && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">
+                  {puxarErro}
+                </div>
+              )}
+              {puxarOk && (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+                  {puxarOk}
+                </div>
+              )}
+              {editZpl && (
+                <p className="mt-3 text-xs text-gray-500">
+                  Etiqueta pronta para ser salva junto com o cadastro.
+                </p>
+              )}
+            </div>
 
             <div className="space-y-4">
               <div>

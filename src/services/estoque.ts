@@ -211,6 +211,8 @@ export async function atualizarProduto(params: {
   descricao?: string
   fornecedor?: string
   codigo_fornecedor?: string
+  /** ZPL da etiqueta do ML, guardado para impressao */
+  zpl?: string
 }): Promise<void> {
   // Verificar se produto existe na tabela produtos
   const { data: existente } = await supabase
@@ -226,6 +228,7 @@ export async function atualizarProduto(params: {
   if (params.descricao !== undefined) updates.descricao = params.descricao
   if (params.fornecedor !== undefined) updates.fornecedor = params.fornecedor
   if (params.codigo_fornecedor !== undefined) updates.codigo_fornecedor = params.codigo_fornecedor || null
+  if (params.zpl !== undefined) updates.zpl = params.zpl || null
 
   if (params.codigo_ml_novo && params.codigo_ml_novo !== params.codigo_ml_atual) {
     updates.codigo_ml = params.codigo_ml_novo
