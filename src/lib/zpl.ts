@@ -19,6 +19,35 @@
  * de barras) e dividimos a quantidade pedida.
  */
 
+/**
+ * Vao horizontal extra entre a etiqueta da esquerda e a da direita, em dots.
+ *
+ * A 203 DPI da ZD220, 1 mm = 8 dots. O template traz duas etiquetas lado a
+ * lado; deslocar so a coluna da direita aumenta o vao entre elas.
+ *
+ * CUIDADO AO AUMENTAR: a mídia de 80 mm tem 639 dots uteis e o conteudo da
+ * direita ja termina perto da borda. 8 dots (1 mm) foi o maior valor seguro
+ * medido. Se precisar de mais, imprima uma folha de teste antes de subir.
+ */
+const VAO_EXTRA_DOTS = 8
+
+/** X a partir do qual um campo pertence a etiqueta da direita. */
+const LIMITE_COLUNA_DIREITA = 300
+
+/**
+ * Desloca para a direita apenas os campos da segunda etiqueta do bloco,
+ * aumentando o vao entre as duas. Nao altera o ZPL armazenado — o ajuste
+ * acontece so na hora de gerar a impressao.
+ */
+function aplicarVaoExtra(bloco: string, dots: number): string {
+  if (!dots) return bloco
+  return bloco.replace(/\^FO(\d+),(\d+)/g, (inteiro, x: string, y: string) => {
+    const px = parseInt(x, 10)
+    if (px < LIMITE_COLUNA_DIREITA) return inteiro
+    return `^FO${px + dots},${y}`
+  })
+}
+
 export interface ResultadoZpl {
   /** ZPL final, pronto para enviar a impressora */
   zpl: string
@@ -59,7 +88,7 @@ export function montarZplParaImpressao(
 
   // O primeiro bloco e a unidade de repeticao. Quando o template ja vem
   // repetido, os blocos seguintes sao identicos — usar o primeiro basta.
-  const unidade = blocos[0].trim()
+  const unidade = aplicarVaoExtra(blocos[0].trim(), VAO_EXTRA_DOTS)
 
   // Quantas etiquetas cabem num bloco: uma por codigo de barras (^BC).
   // Se o template nao tiver codigo de barras, assumimos uma etiqueta.
