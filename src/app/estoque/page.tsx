@@ -173,6 +173,10 @@ function TabEstoque() {
   const [printLoading, setPrintLoading] = useState(false)
   const [printSuccess, setPrintSuccess] = useState('')
   const [printError, setPrintError] = useState('')
+  // Calculadora opcional por caixas
+  const [calcAberta, setCalcAberta] = useState(false)
+  const [calcCaixas, setCalcCaixas] = useState('')
+  const [calcPorCaixa, setCalcPorCaixa] = useState('')
   const etiquetasCache = useRef<{ code: string; desc: string; file: string; fornecedor: string; zpl: string }[] | null>(null)
 
   const carregarEstoque = useCallback(async () => {
@@ -553,8 +557,21 @@ function TabEstoque() {
     setPrintQtd(String(Math.max(0, item.quantidade_disponivel)))
     setPrintError('')
     setPrintSuccess('')
+    // Zerar a calculadora a cada abertura
+    setCalcAberta(false)
+    setCalcCaixas('')
+    setCalcPorCaixa('')
     setPrintOpen(true)
   }
+
+  /** Resultado da calculadora por caixas — null quando falta preencher. */
+  const calcTotal = (() => {
+    const caixas = parseInt(calcCaixas, 10)
+    const porCaixa = parseInt(calcPorCaixa, 10)
+    if (!Number.isFinite(caixas) || !Number.isFinite(porCaixa)) return null
+    if (caixas <= 0 || porCaixa <= 0) return null
+    return caixas * porCaixa
+  })()
 
   const handlePrintEtiqueta = async () => {
     if (!printItem) return
@@ -1817,6 +1834,73 @@ function TabEstoque() {
                 <p className="text-[10px] text-gray-400 mt-1.5">
                   Pré-preenchido com a quantidade em estoque. Ajuste conforme necessário.
                 </p>
+              </div>
+
+              {/* ---- Calculadora opcional por caixas ---- */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                {!calcAberta ? (
+                  <button
+                    onClick={() => setCalcAberta(true)}
+                    className="text-xs font-medium text-[#ff6a00] hover:underline"
+                  >
+                    Não sabe o total? Calcular por caixas
+                  </button>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                        Calcular por caixas
+                      </span>
+                      <button
+                        onClick={() => { setCalcAberta(false); setCalcCaixas(''); setCalcPorCaixa('') }}
+                        className="text-[11px] text-gray-400 hover:text-gray-600"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 block mb-1">Caixas</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={calcCaixas}
+                          onChange={(e) => setCalcCaixas(e.target.value)}
+                          placeholder="Ex: 12"
+                          className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#ff6a00] focus:ring-1 focus:ring-[#ff6a00]"
+                        />
+                      </div>
+                      <span className="pb-2.5 text-gray-400 text-sm">&times;</span>
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 block mb-1">Un. por caixa</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={calcPorCaixa}
+                          onChange={(e) => setCalcPorCaixa(e.target.value)}
+                          placeholder="Ex: 24"
+                          className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#ff6a00] focus:ring-1 focus:ring-[#ff6a00]"
+                        />
+                      </div>
+                      <span className="pb-2.5 text-gray-400 text-sm">=</span>
+                      <div className="w-20 pb-0.5">
+                        <label className="text-[10px] text-gray-500 block mb-1">Total</label>
+                        <div className="text-lg font-bold text-gray-900 leading-8">
+                          {calcTotal !== null ? calcTotal.toLocaleString('pt-BR') : '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => { if (calcTotal !== null) setPrintQtd(String(calcTotal)) }}
+                      disabled={calcTotal === null}
+                      className="w-full mt-3 px-4 py-2 text-xs font-semibold rounded-lg bg-white border border-[#ff6a00] text-[#ff6a00] hover:bg-[#ff6a00] hover:text-white disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#ff6a00] transition-colors"
+                    >
+                      Usar {calcTotal !== null ? calcTotal.toLocaleString('pt-BR') : ''} como quantidade
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
