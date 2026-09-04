@@ -56,6 +56,21 @@ export default function EstoquePage() {
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">Estoque</h1>
             <p className="text-xs text-gray-400 mt-0.5">Saldo por Código ML, envios FULL e histórico</p>
           </div>
+
+          {/* Atalho para criar o envio no Mercado Livre */}
+          <a
+            href="https://vendedores.mercadolivre.com.br/shipping/inbounds#from=seller-menu"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abre o painel de envios ao FULL no Mercado Livre, em uma nova aba"
+            className="ml-auto inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border border-[#ff6a00] text-[#ff6a00] hover:bg-[#ff6a00] hover:text-white transition-colors"
+          >
+            Envios no Mercado Livre
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M6 3h7v7M13 3L6.5 9.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M11 10.5V13H3V5h2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </a>
         </div>
       </div>
 
