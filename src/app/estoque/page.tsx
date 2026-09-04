@@ -8,6 +8,7 @@ import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio 
 import { supabase } from '@/lib/supabase'
 import { montarZplParaImpressao } from '@/lib/zpl'
 import { lerEtiquetaML, ehCodigoML } from '@/lib/etiqueta-ml'
+import { extrairFull } from '@/lib/preparar-full'
 import TabPrepararFull from '@/components/TabPrepararFull'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao, Fornecedor } from '@/types'
 import { listarFornecedoresCompleto, atualizarFornecedor, buscarNFsPorFornecedor } from '@/services/fornecedores'
@@ -1967,6 +1968,44 @@ function TabEnviarFull() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [processing, setProcessing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Caminho alternativo: colar o texto do Mercado Livre
+  const [colarAberto, setColarAberto] = useState(false)
+  const [colarTexto, setColarTexto] = useState('')
+  const [colarNF, setColarNF] = useState('')
+  const [colarEnvioML, setColarEnvioML] = useState('')
+
+  /**
+   * Le o texto colado do ML e monta os itens do envio, sem CSV.
+   * Usa o mesmo parser da aba Preparar FULL.
+   */
+  const handleColarTexto = () => {
+    setErrors([])
+    const resultado = extrairFull(colarTexto)
+
+    if (resultado.itens.length === 0) {
+      setErrors(['Nenhum produto encontrado no texto. Confira se colou a página inteira.'])
+      return
+    }
+
+    const itens: CSVFullItem[] = resultado.itens.map((i) => ({
+      codigo_ml: i.codigo,
+      quantidade: i.quantidade,
+      descricao: i.descricao || undefined,
+    }))
+
+    const hoje = new Date()
+    const dataBR = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`
+
+    setCsvItens(itens)
+    setCsvHeader({
+      data_envio: dataBR,
+      numero_nf: colarNF.trim(),
+      codigo_envio_ml: colarEnvioML.trim(),
+    })
+    setFileName('texto colado do Mercado Livre')
+    if (resultado.avisos.length > 0) setErrors(resultado.avisos)
+    setStep('preview')
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -2035,6 +2074,10 @@ function TabEnviarFull() {
     setCsvHeader(null)
     setErrors([])
     setFileName('')
+    setColarAberto(false)
+    setColarTexto('')
+    setColarNF('')
+    setColarEnvioML('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -2051,22 +2094,104 @@ function TabEnviarFull() {
       )}
 
       {step === 'upload' && (
-        <div
-          className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-16 text-center cursor-pointer hover:border-[#ff6a00] transition-colors"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <div className="text-4xl mb-4 text-[#ff6a00]">&uarr;</div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Enviar CSV FULL</h2>
-          <p className="text-sm text-gray-400 mb-4">
-            Use a planilha padrão de controle de envio (CONTROLE ENVIO CODIGO).
-          </p>
+        <div className="space-y-4">
+          <div
+            className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center cursor-pointer hover:border-[#ff6a00] transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <div className="text-4xl mb-4 text-[#ff6a00]">&uarr;</div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Enviar CSV FULL</h2>
+            <p className="text-sm text-gray-400">
+              Use a planilha padrão de controle de envio (CONTROLE ENVIO CODIGO).
+            </p>
+          </div>
+
+          {/* ---- Alternativa: colar o texto do Mercado Livre ---- */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+            {!colarAberto ? (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Não tem a planilha? Cole o texto do Mercado Livre
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    O mesmo texto usado na aba Preparar FULL. Dá baixa no estoque igual ao CSV.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setColarAberto(true)}
+                  className="shrink-0 px-4 py-2 text-xs font-semibold rounded-lg border border-[#ff6a00] text-[#ff6a00] hover:bg-[#ff6a00] hover:text-white transition-colors"
+                >
+                  Colar texto
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Colar texto do Mercado Livre</h3>
+                  <button
+                    onClick={() => { setColarAberto(false); setColarTexto(''); setErrors([]) }}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    Fechar
+                  </button>
+                </div>
+
+                <textarea
+                  value={colarTexto}
+                  onChange={(e) => setColarTexto(e.target.value)}
+                  rows={7}
+                  placeholder={'Código ML:\nALWO97425\n...\n60 etiquetas'}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs text-gray-800 focus:outline-none focus:border-[#ff6a00] focus:ring-1 focus:ring-[#ff6a00]"
+                />
+
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                      Nº da NF (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={colarNF}
+                      onChange={(e) => setColarNF(e.target.value)}
+                      placeholder="Ex: 218.354"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#ff6a00] focus:ring-1 focus:ring-[#ff6a00]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                      Nº do envio ML (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={colarEnvioML}
+                      onChange={(e) => setColarEnvioML(e.target.value)}
+                      placeholder="Ex: 65623092"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:border-[#ff6a00] focus:ring-1 focus:ring-[#ff6a00]"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-2">
+                  Sem esses números o envio fica sem rastreio no histórico. A data usada é a de hoje.
+                </p>
+
+                <button
+                  onClick={handleColarTexto}
+                  disabled={!colarTexto.trim()}
+                  className="mt-4 px-5 py-2.5 text-sm font-semibold rounded-lg bg-[#ff6a00] text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                >
+                  Conferir itens
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
