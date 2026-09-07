@@ -189,6 +189,9 @@ function TabEstoque() {
   const [printLoading, setPrintLoading] = useState(false)
   const [printSuccess, setPrintSuccess] = useState('')
   const [printError, setPrintError] = useState('')
+  // Etiqueta de caixa
+  const [caixaLoading, setCaixaLoading] = useState('')
+  const [caixaAviso, setCaixaAviso] = useState('')
   // Calculadora opcional por caixas
   const [calcAberta, setCalcAberta] = useState(false)
   const [calcCaixas, setCalcCaixas] = useState('')
@@ -580,6 +583,40 @@ function TabEstoque() {
     setPrintOpen(true)
   }
 
+  /**
+   * Copia a etiqueta de CAIXA do produto (coluna zpl_caixa).
+   * É separada da etiqueta do Mercado Livre, que fica na coluna zpl.
+   */
+  const handleEtiquetaCaixa = async (item: SaldoEstoque) => {
+    setCaixaLoading(item.codigo_ml)
+    setCaixaAviso('')
+    try {
+      const { data } = await supabase
+        .from('produtos')
+        .select('zpl_caixa')
+        .eq('codigo_ml', item.codigo_ml)
+        .limit(1)
+
+      const zpl: string | null = data?.[0]?.zpl_caixa || null
+      if (!zpl) {
+        setCaixaAviso(
+          `${item.codigo_ml} ainda não tem etiqueta de caixa cadastrada.`
+        )
+        setTimeout(() => setCaixaAviso(''), 6000)
+        return
+      }
+
+      await navigator.clipboard.writeText(zpl)
+      setCaixaAviso(`Etiqueta de caixa de "${item.produto}" copiada.`)
+      setTimeout(() => setCaixaAviso(''), 4000)
+    } catch (e) {
+      setCaixaAviso(e instanceof Error ? e.message : 'Erro ao buscar a etiqueta de caixa.')
+      setTimeout(() => setCaixaAviso(''), 6000)
+    } finally {
+      setCaixaLoading('')
+    }
+  }
+
   /** Resultado da calculadora por caixas — null quando falta preencher. */
   const calcTotal = (() => {
     const caixas = parseInt(calcCaixas, 10)
@@ -857,6 +894,11 @@ function TabEstoque() {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            {caixaAviso && (
+              <div className="mx-5 mt-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-800">
+                {caixaAviso}
+              </div>
+            )}
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -990,6 +1032,17 @@ function TabEstoque() {
                               <path d="M4 6V1h8v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               <rect x="1" y="6" width="14" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                               <path d="M4 12v3h8v-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleEtiquetaCaixa(item)}
+                            disabled={caixaLoading === item.codigo_ml}
+                            title="Copiar etiqueta de caixa"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-[#ff6a00] hover:border-orange-300 hover:bg-orange-50 transition-colors bg-white disabled:opacity-50"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                              <path d="M1.5 5.5L8 2l6.5 3.5v5L8 14l-6.5-3.5v-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                              <path d="M1.5 5.5L8 9l6.5-3.5M8 9v5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
                             </svg>
                           </button>
                           <button
