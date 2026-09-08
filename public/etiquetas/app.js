@@ -119,49 +119,52 @@ function escapeZpl(s) {
 }
 
 function buildLabelBlock(xOffset, p, fontProduto) {
-  // Layout vertical (label = 200 dots = 25mm):
-  //   Zona PRODUTO: y=8 .. y=120 (centro=64)  — texto centralizado verticalmente
-  //   Separador  : y=128
-  //   CÓDIGO    : y=138 (size 30, ends 168)
-  //   FORNECEDOR: y=174 (size 24, ends 198)
-  const x = xOffset + PAD;
-  const w = INNER_W;
-  const codSize = 30;
-  const fornSize = 24;
-  const lineSpacing = 4;
+  // Layout com moldura (label = 320 x 200 dots = 40 x 25mm):
+  //
+  //   +--------------------------------+
+  //   |####### FORNECEDOR #############|  faixa preta, texto em negativo (^FR)
+  //   |                                |
+  //   |        NOME DO PRODUTO         |  fonte grande, centralizado
+  //   |                                |
+  //   |================================|  separador grosso
+  //   |#COD ML#|      ABCD12345        |  caixa preta + codigo
+  //   +--------------------------------+
+  //
+  // ^FR inverte o preenchimento: sobre uma area preta (^GB) o texto sai branco.
+  const x = xOffset;
+  const bx = xOffset + 3;          // borda interna
+  const bw = LABEL_W - 6;          // largura util dentro da moldura
+  const lines = [];
 
-  // Estima nº de linhas reais que o produto vai ocupar p/ centralizar verticalmente
-  const charsPerLine = Math.max(1, Math.floor(w / (fontProduto.size * 0.55)));
-  const actualLines = Math.min(
+  lines.push(`; — etiqueta @ x=${xOffset} —`);
+
+  // moldura externa
+  lines.push(`^FO${x},0^GB${LABEL_W},${LABEL_H},3^FS`);
+
+  // faixa do fornecedor, com o texto em negativo
+  lines.push(`^FO${bx},3^GB${bw},36,36^FS`);
+  lines.push(`^FO${bx},10^FR^FB${bw},1,0,C^A0N,22,22^FD${escapeZpl(p.fornecedor)}^FS`);
+
+  // Nome do produto, centralizado na area entre a faixa e o separador.
+  // Os valores de Y vem do layout aprovado: uma linha em 67, duas em 41 —
+  // cada linha extra sobe 26 dots. Preferi a medida real a uma formula
+  // aproximada, para a etiqueta gerada sair identica ao desenho validado.
+  const charsPerLine = Math.max(1, Math.floor(bw / (fontProduto.size * 0.58)));
+  const linhasReais = Math.min(
     fontProduto.maxLines,
     Math.max(1, Math.ceil((p.descricao || '').length / charsPerLine))
   );
-  const totalHeight = fontProduto.size * actualLines + (actualLines - 1) * lineSpacing;
-  const zoneCenter = 64;
-  const produtoY = Math.max(8, Math.round(zoneCenter - totalHeight / 2));
+  const nomeY = Math.max(8, 67 - (linhasReais - 1) * 26);
 
-  const lines = [];
-  lines.push(`; — etiqueta @ x=${xOffset} —`);
-  // PRODUTO (word-wrap centralizado horizontal e vertical)
-  lines.push(`^FO${x},${produtoY}`);
-  lines.push(`^A0N,${fontProduto.size},${fontProduto.size}`);
-  lines.push(`^FB${w},${fontProduto.maxLines},${lineSpacing},C,0`);
-  lines.push(`^FD${escapeZpl(p.descricao)}^FS`);
+  lines.push(`^FO${bx},${nomeY}^FB${bw},${fontProduto.maxLines},0,C^A0N,${fontProduto.size},${fontProduto.size}^FD${escapeZpl(p.descricao)}^FS`);
 
-  // separador horizontal centralizado entre PRODUTO e CÓDIGO
-  lines.push(`^FO${x + 30},128^GB${w - 60},2,2^FS`);
+  // separador grosso acima do rodape
+  lines.push(`^FO${bx},146^GB${bw},4,4^FS`);
 
-  // CÓDIGO
-  lines.push(`^FO${x},138`);
-  lines.push(`^A0N,${codSize},${codSize}`);
-  lines.push(`^FB${w},1,0,C,0`);
-  lines.push(`^FD${escapeZpl(p.codigo)}^FS`);
-
-  // FORNECEDOR
-  lines.push(`^FO${x},174`);
-  lines.push(`^A0N,${fornSize},${fornSize}`);
-  lines.push(`^FB${w},1,0,C,0`);
-  lines.push(`^FD${escapeZpl(p.fornecedor)}^FS`);
+  // rodape: caixa preta "COD ML" + o codigo ao lado
+  lines.push(`^FO${bx},150^GB92,47,47^FS`);
+  lines.push(`^FO${bx},164^FR^FB92,1,0,C^A0N,17,17^FDCOD ML^FS`);
+  lines.push(`^FO${bx + 92},159^FB${bw - 92},1,0,C^A0N,30,30^FD${escapeZpl(p.codigo)}^FS`);
 
   return lines.join('\n');
 }
@@ -209,11 +212,20 @@ function renderPreview(p, fontProduto, mirror) {
   const fCodPx = 30 * dotToPx;
   const fFornPx = 24 * dotToPx;
 
+  // Espelha o layout com moldura do ZPL: faixa do fornecedor em negativo,
+  // nome grande no meio, rodape com a caixa COD ML e o codigo.
   const labelHtml = `
-    <div class="etiqueta">
-      <div class="l-produto" style="font-size:${fProdPx}px; -webkit-line-clamp:${fontProduto.maxLines};">${escapeHtml(p.descricao)}</div>
-      <div class="l-codigo" style="font-size:${fCodPx}px;">${escapeHtml(p.codigo)}</div>
-      <div class="l-forn" style="font-size:${fFornPx}px;">${escapeHtml(p.fornecedor)}</div>
+    <div class="etiqueta" style="border:2px solid #111; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+      <div style="background:#111; color:#fff; font-size:${fFornPx}px; font-weight:700;
+                  text-align:center; padding:3px 0; letter-spacing:.04em;">${escapeHtml(p.fornecedor)}</div>
+      <div style="flex:1; display:flex; align-items:center; justify-content:center; padding:2px 6px;">
+        <div style="font-size:${fProdPx}px; font-weight:700; line-height:1.05; text-align:center;">${escapeHtml(p.descricao)}</div>
+      </div>
+      <div style="display:flex; border-top:3px solid #111;">
+        <div style="background:#111; color:#fff; font-size:${fFornPx * 0.72}px; font-weight:700;
+                    padding:3px 6px; letter-spacing:.05em;">COD ML</div>
+        <div style="flex:1; font-size:${fCodPx}px; font-weight:700; text-align:center; padding:2px 0;">${escapeHtml(p.codigo)}</div>
+      </div>
     </div>`;
 
   preview.innerHTML = mirror ? labelHtml + labelHtml : labelHtml + `
