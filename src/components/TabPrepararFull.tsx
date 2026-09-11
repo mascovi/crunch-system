@@ -22,10 +22,18 @@ export default function TabPrepararFull() {
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState('')
   const [cadastrando, setCadastrando] = useState('')
+  // Envio automático para o Google Sheets
+  const [enviando, setEnviando] = useState(false)
+  const [envioErro, setEnvioErro] = useState('')
+  const [envioOk, setEnvioOk] = useState<{ aba: string; url: string; linhas: number } | null>(null)
 
   const separar = useCallback(async () => {
     setErro('')
     setCopiado('')
+    // Zerar o resultado do envio anterior — senão a tela mostraria uma aba
+    // antiga como se fosse deste texto
+    setEnvioOk(null)
+    setEnvioErro('')
     const resultado = extrairFull(texto)
 
     if (resultado.itens.length === 0) {
@@ -68,6 +76,8 @@ export default function TabPrepararFull() {
     setAvisos([])
     setErro('')
     setCopiado('')
+    setEnvioOk(null)
+    setEnvioErro('')
   }
 
   const copiar = async (valor: string, qual: string) => {
@@ -83,6 +93,39 @@ export default function TabPrepararFull() {
     }
     setCopiado(qual)
     setTimeout(() => setCopiado(''), 2000)
+  }
+
+  /**
+   * Manda os itens para o Google Sheets: duplica a aba modelo e escreve
+   * códigos na coluna D e quantidades na coluna F, a partir da linha 8.
+   */
+  const enviarParaPlanilha = async () => {
+    setEnviando(true)
+    setEnvioErro('')
+    setEnvioOk(null)
+    try {
+      const res = await fetch('/api/sheets/preparar-envio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itens: itens.map((i) => ({ codigo: i.codigo, quantidade: i.quantidade })),
+        }),
+      })
+      const data = await res.json()
+      console.log('[Planilha] resposta:', res.status, data)
+
+      if (data.ok) {
+        setEnvioOk({ aba: data.aba, url: data.url, linhas: data.linhas })
+      } else {
+        setEnvioErro(
+          `${data.error || `HTTP ${res.status}`}${data.deploy ? ` [build ${data.deploy}]` : ''}`
+        )
+      }
+    } catch (e) {
+      setEnvioErro(e instanceof Error ? e.message : 'Falha ao falar com o servidor.')
+    } finally {
+      setEnviando(false)
+    }
   }
 
   /** Cadastra o produto que ainda não existe, usando os dados do próprio texto do ML */
@@ -278,17 +321,83 @@ export default function TabPrepararFull() {
             />
           </div>
 
-          {/* Ir para a planilha */}
-          <div className="flex justify-end">
-            <a
-              href={URL_PLANILHA}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-xl bg-[#ff6a00] text-white hover:bg-orange-600 transition-colors"
-            >
-              Ir para planilha de envio
-              <span aria-hidden="true">&rarr;</span>
-            </a>
+          {/* Envio para a planilha */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            {envioOk ? (
+              <div>
+                <div className="flex items-start gap-2 mb-3">
+                  <span className="text-green-600 mt-px">&#10003;</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      Aba <span className="font-mono">{envioOk.aba}</span> criada na planilha
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {envioOk.linhas} produto{envioOk.linhas > 1 ? 's' : ''} escritos nas colunas D e F,
+                      a partir da linha 8.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={envioOk.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-xl bg-[#ff6a00] text-white hover:bg-orange-600 transition-colors"
+                  >
+                    Abrir a aba criada
+                    <span aria-hidden="true">&rarr;</span>
+                  </a>
+                  <button
+                    onClick={enviarParaPlanilha}
+                    disabled={enviando}
+                    className="px-4 py-3 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    Criar outra aba
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Enviar para a planilha</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Duplica a aba COPIAR e preenche os códigos e as quantidades sozinho.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={URL_PLANILHA}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-3 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Abrir planilha
+                  </a>
+                  <button
+                    onClick={enviarParaPlanilha}
+                    disabled={enviando}
+                    className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-xl bg-[#ff6a00] text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                  >
+                    {enviando ? 'Criando aba...' : 'Criar aba na planilha'}
+                    {!enviando && <span aria-hidden="true">&rarr;</span>}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {envioErro && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-medium text-amber-900">
+                  Não consegui criar a aba na planilha
+                </p>
+                <p className="mt-1 font-mono text-[11px] leading-relaxed text-amber-800 break-words">
+                  {envioErro}
+                </p>
+                <p className="mt-2 text-xs text-amber-700">
+                  As listas acima continuam válidas — pode copiar e colar à mão enquanto isso.
+                </p>
+              </div>
+            )}
           </div>
         </>
       )}
