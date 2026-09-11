@@ -3,9 +3,7 @@
 import { useState, useCallback } from 'react'
 import { extrairFull, type ItemFull } from '@/lib/preparar-full'
 import { listarEstoque, cadastrarProduto } from '@/services/estoque'
-
-const URL_PLANILHA =
-  'https://docs.google.com/spreadsheets/d/1DcXbresRLktKlvkqOUzPBNUL1WNVX0kyio1mlnx6HI4/edit?gid=0#gid=0'
+import { processarEnvioFull } from '@/services/full'
 
 /** Item já cruzado com o estoque */
 interface ItemCruzado extends ItemFull {
@@ -26,16 +24,33 @@ export default function TabPrepararFull() {
   const [enviando, setEnviando] = useState(false)
   const [envioErro, setEnvioErro] = useState('')
   const [envioOk, setEnvioOk] = useState<{ aba: string; url: string; linhas: number } | null>(null)
+  const [popupBloqueado, setPopupBloqueado] = useState(false)
+  // Baixa no estoque
+  const [confirmandoBaixa, setConfirmandoBaixa] = useState(false)
+  const [dandoBaixa, setDandoBaixa] = useState(false)
+  const [baixaErro, setBaixaErro] = useState('')
+  const [baixaFeita, setBaixaFeita] = useState<{ total: number; codigos: number } | null>(null)
 
-  const separar = useCallback(async () => {
+  /**
+   * Um clique só: extrai do texto, cruza com o estoque, cria a aba na planilha
+   * e abre em outra aba.
+   *
+   * A aba do navegador é aberta ANTES da chamada assíncrona, ainda dentro do
+   * clique. Navegador bloqueia window.open disparado depois de um await — por
+   * isso a janela é criada vazia e o endereço é preenchido quando a resposta
+   * chega. Se mesmo assim for bloqueada, a tela mostra o link para clicar.
+   */
+  const criarPlanilha = useCallback(async () => {
     setErro('')
     setCopiado('')
-    // Zerar o resultado do envio anterior — senão a tela mostraria uma aba
-    // antiga como se fosse deste texto
     setEnvioOk(null)
     setEnvioErro('')
-    const resultado = extrairFull(texto)
+    setPopupBloqueado(false)
+    setBaixaFeita(null)
+    setBaixaErro('')
+    setConfirmandoBaixa(false)
 
+    const resultado = extrairFull(texto)
     if (resultado.itens.length === 0) {
       setItens([])
       setAvisos(resultado.avisos)
@@ -43,14 +58,18 @@ export default function TabPrepararFull() {
       return
     }
 
-    setProcessando(true)
-    try {
-      // Cruzar com o estoque atual
-      const saldos = await listarEstoque()
-      const porCodigo = new Map(saldos.map((s) => [s.codigo_ml.toUpperCase(), s]))
+    // Reservar a aba agora, enquanto ainda é um clique do usuário
+    const janela = window.open('', '_blank')
 
-      setItens(
-        resultado.itens.map((it) => {
+    setProcessando(true)
+    setEnviando(true)
+    try {
+      // 1. Cruzar com o estoque
+      let cruzados: ItemCruzado[]
+      try {
+        const saldos = await listarEstoque()
+        const porCodigo = new Map(saldos.map((s) => [s.codigo_ml.toUpperCase(), s]))
+        cruzados = resultado.itens.map((it) => {
           const s = porCodigo.get(it.codigo)
           return {
             ...it,
@@ -58,17 +77,78 @@ export default function TabPrepararFull() {
             descricaoEstoque: s ? s.produto : '',
           }
         })
-      )
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : 'Erro ao consultar o estoque.')
+        cruzados = resultado.itens.map((it) => ({ ...it, saldo: null, descricaoEstoque: '' }))
+      }
+      setItens(cruzados)
       setAvisos(resultado.avisos)
+
+      // 2. Criar a aba na planilha
+      const res = await fetch('/api/sheets/preparar-envio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itens: resultado.itens.map((i) => ({ codigo: i.codigo, quantidade: i.quantidade })),
+        }),
+      })
+      const data = await res.json()
+      console.log('[Planilha] resposta:', res.status, data)
+
+      if (data.ok) {
+        setEnvioOk({ aba: data.aba, url: data.url, linhas: data.linhas })
+        if (janela && !janela.closed) {
+          janela.location.href = data.url
+        } else {
+          setPopupBloqueado(true)
+        }
+      } else {
+        if (janela && !janela.closed) janela.close()
+        setEnvioErro(
+          `${data.error || `HTTP ${res.status}`}${data.deploy ? ` [build ${data.deploy}]` : ''}`
+        )
+      }
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao consultar o estoque.')
-      // Mesmo sem o cruzamento, entregar as listas
-      setItens(resultado.itens.map((it) => ({ ...it, saldo: null, descricaoEstoque: '' })))
-      setAvisos(resultado.avisos)
+      if (janela && !janela.closed) janela.close()
+      setEnvioErro(e instanceof Error ? e.message : 'Falha ao falar com o servidor.')
     } finally {
       setProcessando(false)
+      setEnviando(false)
     }
   }, [texto])
+
+  /**
+   * Dá baixa no estoque, registrando o envio FULL.
+   * É irreversível, por isso exige confirmação e trava depois de feita.
+   */
+  const darBaixa = async () => {
+    setDandoBaixa(true)
+    setBaixaErro('')
+    try {
+      const hoje = new Date()
+      const dataBR = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`
+
+      const envio = await processarEnvioFull(
+        itens.map((i) => ({
+          codigo_ml: i.codigo,
+          quantidade: i.quantidade,
+          descricao: i.descricaoEstoque || i.descricao || undefined,
+        })),
+        { data_envio: dataBR, numero_nf: '', codigo_envio_ml: envioOk?.aba || '' }
+      )
+
+      setBaixaFeita({
+        total: itens.reduce((s, i) => s + i.quantidade, 0),
+        codigos: itens.length,
+      })
+      setConfirmandoBaixa(false)
+      console.log('[Baixa FULL] envio registrado:', envio)
+    } catch (e) {
+      setBaixaErro(e instanceof Error ? e.message : 'Erro ao dar baixa no estoque.')
+    } finally {
+      setDandoBaixa(false)
+    }
+  }
 
   const limpar = () => {
     setTexto('')
@@ -78,6 +158,10 @@ export default function TabPrepararFull() {
     setCopiado('')
     setEnvioOk(null)
     setEnvioErro('')
+    setPopupBloqueado(false)
+    setBaixaFeita(null)
+    setBaixaErro('')
+    setConfirmandoBaixa(false)
   }
 
   const copiar = async (valor: string, qual: string) => {
@@ -93,39 +177,6 @@ export default function TabPrepararFull() {
     }
     setCopiado(qual)
     setTimeout(() => setCopiado(''), 2000)
-  }
-
-  /**
-   * Manda os itens para o Google Sheets: duplica a aba modelo e escreve
-   * códigos na coluna D e quantidades na coluna F, a partir da linha 8.
-   */
-  const enviarParaPlanilha = async () => {
-    setEnviando(true)
-    setEnvioErro('')
-    setEnvioOk(null)
-    try {
-      const res = await fetch('/api/sheets/preparar-envio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itens: itens.map((i) => ({ codigo: i.codigo, quantidade: i.quantidade })),
-        }),
-      })
-      const data = await res.json()
-      console.log('[Planilha] resposta:', res.status, data)
-
-      if (data.ok) {
-        setEnvioOk({ aba: data.aba, url: data.url, linhas: data.linhas })
-      } else {
-        setEnvioErro(
-          `${data.error || `HTTP ${res.status}`}${data.deploy ? ` [build ${data.deploy}]` : ''}`
-        )
-      }
-    } catch (e) {
-      setEnvioErro(e instanceof Error ? e.message : 'Falha ao falar com o servidor.')
-    } finally {
-      setEnviando(false)
-    }
   }
 
   /** Cadastra o produto que ainda não existe, usando os dados do próprio texto do ML */
@@ -177,11 +228,11 @@ export default function TabPrepararFull() {
         />
         <div className="flex items-center gap-3 mt-3">
           <button
-            onClick={separar}
-            disabled={processando || !texto.trim()}
+            onClick={criarPlanilha}
+            disabled={processando || enviando || !texto.trim()}
             className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#ff6a00] text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
           >
-            {processando ? 'Processando...' : 'Separar listas'}
+            {processando || enviando ? 'Criando planilha...' : 'Criar planilha'}
           </button>
           <button
             onClick={limpar}
@@ -321,80 +372,125 @@ export default function TabPrepararFull() {
             />
           </div>
 
-          {/* Envio para a planilha */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            {envioOk ? (
-              <div>
-                <div className="flex items-start gap-2 mb-3">
-                  <span className="text-green-600 mt-px">&#10003;</span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      Aba <span className="font-mono">{envioOk.aba}</span> criada na planilha
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {envioOk.linhas} produto{envioOk.linhas > 1 ? 's' : ''} escritos nas colunas D e F,
-                      a partir da linha 8.
-                    </p>
-                  </div>
+          {/* Resultado da planilha */}
+          {envioOk && (
+            <div className="bg-white rounded-xl border border-green-200 p-5 shadow-sm">
+              <div className="flex items-start gap-2">
+                <span className="text-green-600 mt-px">&#10003;</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">
+                    Aba <span className="font-mono">{envioOk.aba}</span> criada na planilha
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {envioOk.linhas} produto{envioOk.linhas > 1 ? 's' : ''} nas colunas D e F, a partir
+                    da linha 8.
+                    {!popupBloqueado && ' A planilha abriu em outra aba.'}
+                  </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <a
-                    href={envioOk.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-xl bg-[#ff6a00] text-white hover:bg-orange-600 transition-colors"
-                  >
-                    Abrir a aba criada
-                    <span aria-hidden="true">&rarr;</span>
-                  </a>
+                <a
+                  href={envioOk.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                    popupBloqueado
+                      ? 'bg-[#ff6a00] text-white hover:bg-orange-600'
+                      : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {popupBloqueado ? 'Abrir a planilha' : 'Abrir de novo'}
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
+              </div>
+              {popupBloqueado && (
+                <p className="mt-3 text-xs text-amber-700">
+                  O navegador bloqueou a abertura automática. Clique no botão acima — e, se quiser que
+                  abra sozinho das próximas vezes, libere pop-ups para este site.
+                </p>
+              )}
+            </div>
+          )}
+
+          {envioErro && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+              <p className="text-sm font-medium text-amber-900">
+                Não consegui criar a aba na planilha
+              </p>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed text-amber-800 break-words">
+                {envioErro}
+              </p>
+              <p className="mt-2 text-xs text-amber-700">
+                As listas acima continuam válidas — pode copiar e colar à mão enquanto isso.
+              </p>
+            </div>
+          )}
+
+          {/* Baixa no estoque */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            {baixaFeita ? (
+              <div className="flex items-start gap-2">
+                <span className="text-green-600 mt-px">&#10003;</span>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Baixa registrada no estoque</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {baixaFeita.total.toLocaleString('pt-BR')} unidades de {baixaFeita.codigos} código
+                    {baixaFeita.codigos > 1 ? 's' : ''} saíram do estoque. O envio está no histórico FULL.
+                  </p>
+                </div>
+              </div>
+            ) : confirmandoBaixa ? (
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  Confirmar a baixa de {itens.reduce((s, i) => s + i.quantidade, 0).toLocaleString('pt-BR')} unidades?
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Isso gera saída no estoque dos {itens.length} produtos da lista e registra o envio no
+                  histórico. Não dá para desfazer pela tela.
+                </p>
+                {itens.some((i) => i.saldo !== null && i.saldo < i.quantidade) && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    Atenção: há produto com saldo menor que a quantidade pedida. O estoque vai ficar
+                    negativo nesses itens.
+                  </p>
+                )}
+                <div className="flex items-center gap-3 mt-4">
                   <button
-                    onClick={enviarParaPlanilha}
-                    disabled={enviando}
-                    className="px-4 py-3 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    onClick={darBaixa}
+                    disabled={dandoBaixa}
+                    className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
                   >
-                    Criar outra aba
+                    {dandoBaixa ? 'Dando baixa...' : 'Sim, dar baixa'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmandoBaixa(false)}
+                    disabled={dandoBaixa}
+                    className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    Cancelar
                   </button>
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Enviar para a planilha</p>
+                  <p className="text-sm font-semibold text-gray-900">Dar baixa no estoque</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Duplica a aba COPIAR e preenche os códigos e as quantidades sozinho.
+                    Registra o envio FULL e desconta as quantidades do saldo.
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <a
-                    href={URL_PLANILHA}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-3 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-                  >
-                    Abrir planilha
-                  </a>
-                  <button
-                    onClick={enviarParaPlanilha}
-                    disabled={enviando}
-                    className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-xl bg-[#ff6a00] text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
-                  >
-                    {enviando ? 'Criando aba...' : 'Criar aba na planilha'}
-                    {!enviando && <span aria-hidden="true">&rarr;</span>}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setConfirmandoBaixa(true)}
+                  className="px-5 py-3 text-sm font-semibold rounded-xl border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
+                >
+                  Dar baixa no estoque
+                </button>
               </div>
             )}
 
-            {envioErro && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-                <p className="text-sm font-medium text-amber-900">
-                  Não consegui criar a aba na planilha
-                </p>
-                <p className="mt-1 font-mono text-[11px] leading-relaxed text-amber-800 break-words">
-                  {envioErro}
-                </p>
-                <p className="mt-2 text-xs text-amber-700">
-                  As listas acima continuam válidas — pode copiar e colar à mão enquanto isso.
+            {baixaErro && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                <p className="text-sm font-medium text-red-900">Não consegui dar baixa</p>
+                <p className="mt-1 font-mono text-[11px] leading-relaxed text-red-800 break-words">
+                  {baixaErro}
                 </p>
               </div>
             )}
