@@ -116,13 +116,19 @@ async function chamar(url: string, token: string, init?: RequestInit) {
  *   D  PART NUMBER ANUNCIO   codigo ML — e a chave da busca
  *   E  VARIACAO              sabor/tamanho
  *   F  ITENS POR VOLUME      quantas unidades cabem na caixa
- *   G  Kg Unitario           TEXTO no formato "0,30 Kg", nao numero
+ *   G  Kg Unitario           NUMERO puro
  *
- * Duas armadilhas conhecidas, tratadas aqui:
- *  1. Codigo repetido — o PROCV devolve so a primeira ocorrencia e ignora as
- *     outras em silencio. Ja existem tres pares duplicados na planilha, entao
- *     antes de acrescentar sempre procuramos o codigo.
- *  2. Coluna G e texto. Gravar 0.3 como numero deixa a coluna mista.
+ * SOBRE A COLUNA G: ela aparece como "0,30 Kg" na tela, mas o "Kg" vem da
+ * FORMATACAO da celula, nao do conteudo. Gravamos numero puro. Escrever a
+ * string "0,30 Kg" faria a celula virar texto e quebrar toda formula que
+ * some ou multiplique peso.
+ *
+ * Por isso tambem usamos RAW (e nao USER_ENTERED) na escrita: USER_ENTERED
+ * reinterpreta o valor e pode trocar a formatacao existente da celula.
+ *
+ * Armadilha conhecida: codigo repetido. O PROCV devolve so a primeira
+ * ocorrencia e ignora as outras em silencio — ja existem tres pares
+ * duplicados na planilha. Antes de acrescentar sempre procuramos o codigo.
  */
 const ABA_BANCO = 'BANCO_DE_DADOS'
 /** Os dados comecam na linha 2; a 1 e o cabecalho. */
@@ -139,7 +145,7 @@ export interface ProdutoBanco {
   variacao: string
   /** Coluna F */
   itensPorVolume: number
-  /** Coluna G, ja como numero. A formatacao "0,30 Kg" e feita aqui. */
+  /** Coluna G — numero puro. O "Kg" e formatacao da celula, nao conteudo. */
   kgUnitario: number
 }
 
@@ -156,9 +162,57 @@ export interface ResultadoBanco {
   url?: string
 }
 
-/** "0,30 Kg" — o formato exato que o resto da coluna usa. */
-function formatarKg(valor: number): string {
-  return `${valor.toFixed(2).replace('.', ',')} Kg`
+/**
+ * Copia SO A FORMATACAO da linha de cima para a linha nova (colunas A a G).
+ * E isso que faz o "Kg" aparecer na coluna G sem que ele seja texto: o
+ * sufixo vem da mascara de numero da celula, que e formatacao.
+ */
+async function copiarFormatacaoDaLinhaAcima(
+  spreadsheetId: string,
+  token: string,
+  linha: number
+) {
+  const planilha = await chamar(
+    `${URL_API}/${spreadsheetId}?fields=sheets.properties`,
+    token
+  )
+  const aba = (planilha.sheets || []).find(
+    (s: { properties: { title: string } }) =>
+      s.properties.title.trim().toUpperCase() === ABA_BANCO
+  )
+  if (!aba) return
+
+  const sheetId = aba.properties.sheetId
+  // A API conta linhas a partir do zero e o fim e exclusivo
+  const origem = linha - 2
+  const destino = linha - 1
+
+  await chamar(`${URL_API}/${spreadsheetId}:batchUpdate`, token, {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: [
+        {
+          copyPaste: {
+            source: {
+              sheetId,
+              startRowIndex: origem,
+              endRowIndex: origem + 1,
+              startColumnIndex: 0,
+              endColumnIndex: 7,
+            },
+            destination: {
+              sheetId,
+              startRowIndex: destino,
+              endRowIndex: destino + 1,
+              startColumnIndex: 0,
+              endColumnIndex: 7,
+            },
+            pasteType: 'PASTE_FORMAT',
+          },
+        },
+      ],
+    }),
+  })
 }
 
 /**
@@ -237,34 +291,36 @@ export async function salvarNoBancoDeDados(
       ? `${ABA_BANCO}!B${linha}:G${linha}`
       : `${ABA_BANCO}!A${linha}:G${linha}`
 
-    const valores = jaExiste
-      ? [
-          [
-            produto.descricao,
-            produto.fornecedor,
-            codigo,
-            produto.variacao,
-            produto.itensPorVolume,
-            formatarKg(produto.kgUnitario),
-          ],
-        ]
-      : [
-          [
-            indice,
-            produto.descricao,
-            produto.fornecedor,
-            codigo,
-            produto.variacao,
-            produto.itensPorVolume,
-            formatarKg(produto.kgUnitario),
-          ],
-        ]
+    // Numeros vao como numero (F e G) e o resto como texto. RAW preserva a
+    // formatacao que a celula ja tem — e o formato da coluna G que desenha
+    // o "Kg" na tela, sem contaminar o valor.
+    const miolo = [
+      produto.descricao,
+      produto.fornecedor,
+      codigo,
+      produto.variacao,
+      produto.itensPorVolume,
+      produto.kgUnitario,
+    ]
+    const valores = jaExiste ? [miolo] : [[indice, ...miolo]]
 
     await chamar(
-      `${URL_API}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+      `${URL_API}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
       token,
       { method: 'PUT', body: JSON.stringify({ range, values: valores }) }
     )
+
+    // Linha nova nasce sem a formatacao da tabela — inclusive sem o "Kg" da
+    // coluna G, que e mascara de numero. Copiamos a formatacao da linha de
+    // cima em vez de chutar um padrao: assim vale o que o Pedro ja usa.
+    // Falha aqui e cosmetica, entao nao derruba o cadastro.
+    if (!jaExiste && linha > PRIMEIRA_LINHA_BANCO) {
+      try {
+        await copiarFormatacaoDaLinhaAcima(spreadsheetId, token, linha)
+      } catch (e) {
+        console.warn('[BANCO_DE_DADOS] nao consegui copiar a formatacao:', e)
+      }
+    }
 
     return {
       ok: true,
