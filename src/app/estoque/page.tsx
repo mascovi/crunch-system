@@ -117,6 +117,8 @@ function TabEstoque() {
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [filtroFornecedor, setFiltroFornecedor] = useState('')
+  /** Produtos zerados ficam escondidos até você pedir para ver. */
+  const [mostrarZerados, setMostrarZerados] = useState(false)
 
   // Modal Ajuste
   const [ajusteOpen, setAjusteOpen] = useState(false)
@@ -234,12 +236,17 @@ function TabEstoque() {
 
   // Filtro + busca
   const filtrado = useMemo(() => {
-    let items = estoque.filter((item) => {
+    const items = estoque.filter((item) => {
       const matchBusca =
         item.codigo_ml.toLowerCase().includes(busca.toLowerCase()) ||
         item.produto.toLowerCase().includes(busca.toLowerCase())
       const matchFornecedor = !filtroFornecedor || item.fornecedor_principal === filtroFornecedor
-      return matchBusca && matchFornecedor
+      // Zerados ficam fora por padrão: a lista do dia a dia é do que existe.
+      // Quando a busca é por um código específico, mostra mesmo zerado — quem
+      // procura "ALWO97425" quer saber que ele está zerado, não que sumiu.
+      const matchZerado =
+        mostrarZerados || busca.trim().length > 0 || item.quantidade_disponivel > 0
+      return matchBusca && matchFornecedor && matchZerado
     })
 
     // Sort
@@ -263,7 +270,7 @@ function TabEstoque() {
     })
 
     return items
-  }, [estoque, busca, filtroFornecedor, sortCol, sortDir])
+  }, [estoque, busca, filtroFornecedor, sortCol, sortDir, mostrarZerados])
 
   // KPIs
   const totalSKUs = estoque.length
@@ -1003,13 +1010,60 @@ function TabEstoque() {
             {filtrado.length} de {estoque.length} itens
           </span>
         </div>
+
+        {/* Zerados: escondidos por padrão, com o aviso de quantos são */}
+        {zeradoCount > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
+            <button
+              onClick={() => setMostrarZerados((v) => !v)}
+              className="text-xs text-gray-400 hover:text-[#ff6a00] transition-colors flex items-center gap-1.5"
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                {mostrarZerados ? (
+                  <>
+                    <path d="M2 8s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z" stroke="currentColor" strokeWidth="1.3" />
+                    <circle cx="8" cy="8" r="1.7" stroke="currentColor" strokeWidth="1.3" />
+                    <path d="M3 13L13 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M2 8s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z" stroke="currentColor" strokeWidth="1.3" />
+                    <circle cx="8" cy="8" r="1.7" stroke="currentColor" strokeWidth="1.3" />
+                  </>
+                )}
+              </svg>
+              {mostrarZerados
+                ? `Ocultar os ${zeradoCount} zerados`
+                : `Mostrar ${zeradoCount} ${zeradoCount > 1 ? 'itens zerados' : 'item zerado'}`}
+            </button>
+            {busca.trim().length > 0 && !mostrarZerados && (
+              <span className="text-[11px] text-gray-300">
+                · durante a busca, os zerados aparecem
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ========== TABELA ========== */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {filtrado.length === 0 ? (
           <div className="px-6 py-16 text-center text-gray-400 text-sm">
-            {estoque.length === 0 ? 'Estoque vazio. Confirme o recebimento de uma NF para dar entrada.' : 'Nenhum resultado encontrado.'}
+            {estoque.length === 0 ? (
+              'Estoque vazio. Confirme o recebimento de uma NF para dar entrada.'
+            ) : !mostrarZerados && !busca.trim() && !filtroFornecedor && zeradoCount === estoque.length ? (
+              <>
+                Todos os {zeradoCount} produtos estão zerados e por isso ocultos.{' '}
+                <button
+                  onClick={() => setMostrarZerados(true)}
+                  className="text-[#ff6a00] hover:underline font-medium"
+                >
+                  Mostrar mesmo assim
+                </button>
+              </>
+            ) : (
+              'Nenhum resultado encontrado.'
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
