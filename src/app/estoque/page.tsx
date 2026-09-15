@@ -1072,13 +1072,13 @@ function TabEstoque() {
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Código ML</th>
                   <th
-                    className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none"
+                    className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none min-w-[320px]"
                     onClick={() => handleSort('produto')}
                   >
                     Produto<SortIcon col="produto" />
                   </th>
                   <th
-                    className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none min-w-[150px]"
+                    className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 cursor-pointer hover:text-[#ff6a00] select-none w-px"
                     onClick={() => handleSort('fornecedor')}
                   >
                     Fornecedor<SortIcon col="fornecedor" />
@@ -1129,7 +1129,7 @@ function TabEstoque() {
                           </span>
                         )}
                       </td>
-                      <td className={`px-4 py-3 max-w-[220px] font-medium ${semCodigoML ? 'text-red-800' : 'text-gray-700'}`}>
+                      <td className={`px-4 py-3 min-w-[320px] font-medium ${semCodigoML ? 'text-red-800' : 'text-gray-700'}`}>
                         <span className="block leading-tight text-sm">{item.produto}</span>
                         {semCodigoML && (
                           <span className="block text-[11px] text-red-600 mt-0.5 font-mono">
