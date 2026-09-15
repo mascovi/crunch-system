@@ -164,7 +164,9 @@ export async function ajustarEstoque(params: {
 /**
  * Cadastrar novo produto na tabela produtos.
  */
-export async function cadastrarProduto(produto: Produto): Promise<void> {
+export async function cadastrarProduto(
+  produto: Produto & { zpl?: string }
+): Promise<void> {
   // Verificar se já existe
   const { data: existente } = await supabase
     .from('produtos')
@@ -183,6 +185,9 @@ export async function cadastrarProduto(produto: Produto): Promise<void> {
       descricao: produto.descricao,
       fornecedor: produto.fornecedor,
       codigo_fornecedor: produto.codigo_fornecedor || null,
+      // Quando o cadastro veio de uma etiqueta colada, ja guarda o ZPL —
+      // assim o produto nasce pronto para impressao, sem um segundo passo.
+      ...(produto.zpl ? { zpl: produto.zpl } : {}),
     })
 
   if (error) throw new Error(`Erro ao cadastrar produto: ${error.message}`)

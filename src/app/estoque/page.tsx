@@ -156,6 +156,22 @@ function TabEstoque() {
   const [novoProdLoading, setNovoProdLoading] = useState(false)
   const [novoProdError, setNovoProdError] = useState('')
   const [novoProdSuccess, setNovoProdSuccess] = useState('')
+  // Cadastro pela etiqueta
+  const [novoModo, setNovoModo] = useState<'etiqueta' | 'manual'>('etiqueta')
+  const [novoEtiquetaTexto, setNovoEtiquetaTexto] = useState('')
+  const [novoEtiquetaErro, setNovoEtiquetaErro] = useState('')
+  const [novoZpl, setNovoZpl] = useState('')
+  const [novoLida, setNovoLida] = useState(false)
+  // Campos que a etiqueta não sabe, mas a planilha exige
+  const [novoVariacao, setNovoVariacao] = useState('')
+  const [novoNomeCurto, setNovoNomeCurto] = useState('')
+  const [novoItensCaixa, setNovoItensCaixa] = useState('')
+  const [novoKgUnitario, setNovoKgUnitario] = useState('')
+  // Resultado da gravação na planilha — separado do resultado do Supabase,
+  // porque um pode dar certo e o outro não
+  const [novoPlanilhaErro, setNovoPlanilhaErro] = useState('')
+  const [novoPlanilhaOk, setNovoPlanilhaOk] = useState('')
+  const [novoSalvandoPlanilha, setNovoSalvandoPlanilha] = useState(false)
 
   // Modal Histórico
   const [historicoOpen, setHistoricoOpen] = useState(false)
@@ -440,23 +456,147 @@ function TabEstoque() {
     setNovoQtdInicial('')
     setNovoProdError('')
     setNovoProdSuccess('')
+    setNovoModo('etiqueta')
+    setNovoEtiquetaTexto('')
+    setNovoEtiquetaErro('')
+    setNovoZpl('')
+    setNovoLida(false)
+    setNovoVariacao('')
+    setNovoNomeCurto('')
+    setNovoItensCaixa('')
+    setNovoKgUnitario('')
+    setNovoPlanilhaErro('')
+    setNovoPlanilhaOk('')
     setNovoProdOpen(true)
   }
 
+  /**
+   * Lê a etiqueta colada e preenche o formulário inteiro.
+   *
+   * Roda sozinho no onChange do campo: colar a etiqueta já é a intenção, não
+   * faz sentido pedir um segundo clique. Enquanto o texto não for uma etiqueta
+   * válida, fica quieto — só reclama depois que o ^XZ aparece.
+   *
+   * O campo "SKU:" da etiqueta continua ignorado de propósito: ele NÃO é o
+   * código do fornecedor.
+   */
+  const lerEtiquetaNovoProduto = (texto: string) => {
+    setNovoEtiquetaTexto(texto)
+    setNovoEtiquetaErro('')
+
+    if (!texto.trim()) {
+      setNovoLida(false)
+      return
+    }
+    // Ainda está colando — espera fechar a etiqueta antes de julgar
+    if (!texto.includes('^XZ')) return
+
+    try {
+      const dados = lerEtiquetaML(texto)
+      setNovoCodigoMl(dados.codigoMl)
+      setNovoDescricao(dados.descricao)
+      if (dados.fornecedor) setNovoFornecedor(dados.fornecedor)
+      setNovoVariacao(dados.variacaoSugerida)
+      setNovoNomeCurto(dados.nomeCurtoSugerido)
+      setNovoZpl(dados.zpl)
+      setNovoLida(true)
+    } catch (e) {
+      setNovoLida(false)
+      setNovoEtiquetaErro(e instanceof Error ? e.message : 'Não consegui ler a etiqueta.')
+    }
+  }
+
+  /**
+   * Grava o produto na planilha. Separado do cadastro no Supabase para poder
+   * ser chamado de novo se só a planilha falhar — sem tentar recadastrar um
+   * produto que já entrou no estoque.
+   */
+  const salvarNaPlanilha = async (permitirAtualizar = false): Promise<boolean> => {
+    setNovoSalvandoPlanilha(true)
+    setNovoPlanilhaErro('')
+    try {
+      const res = await fetch('/api/sheets/banco-de-dados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codigoMl: novoCodigoMl.trim().toUpperCase(),
+          descricao: novoNomeCurto.trim().toUpperCase(),
+          fornecedor: novoFornecedor.trim().toUpperCase(),
+          variacao: novoVariacao.trim().toUpperCase(),
+          itensPorVolume: parseInt(novoItensCaixa, 10),
+          kgUnitario: parseFloat(novoKgUnitario.replace(',', '.')),
+          permitirAtualizar,
+        }),
+      })
+      const data = await res.json()
+      console.log('[BANCO_DE_DADOS] resposta:', res.status, data)
+
+      if (data.ok) {
+        setNovoPlanilhaOk(
+          data.atualizou
+            ? `Linha ${data.linha} da planilha atualizada.`
+            : `Acrescentado na planilha, linha ${data.linha} (item ${data.indice}).`
+        )
+        return true
+      }
+      setNovoPlanilhaErro(
+        `${data.error || `HTTP ${res.status}`}${data.deploy ? ` [build ${data.deploy}]` : ''}`
+      )
+      return false
+    } catch (e) {
+      setNovoPlanilhaErro(e instanceof Error ? e.message : 'Falha ao falar com o servidor.')
+      return false
+    } finally {
+      setNovoSalvandoPlanilha(false)
+    }
+  }
+
   const handleNovoProduto = async () => {
+    const itens = parseInt(novoItensCaixa, 10)
+    const kg = parseFloat(novoKgUnitario.replace(',', '.'))
+
     if (!novoCodigoMl.trim() || !novoDescricao.trim() || !novoFornecedor.trim()) {
       setNovoProdError('Preencha Código ML, descrição e fornecedor.')
       return
     }
+    if (!novoNomeCurto.trim()) {
+      setNovoProdError('Preencha o nome curto — é ele que vai para a planilha.')
+      return
+    }
+    // Peso e itens por caixa são obrigatórios: sem eles a planilha aceita uma
+    // linha incompleta e o próximo envio FULL sai com o frete errado.
+    if (isNaN(itens) || itens <= 0) {
+      setNovoProdError('Informe quantos itens cabem numa caixa.')
+      return
+    }
+    if (isNaN(kg) || kg <= 0) {
+      setNovoProdError('Informe o peso de uma unidade, em kg.')
+      return
+    }
+
     setNovoProdLoading(true)
     setNovoProdError('')
+    setNovoPlanilhaErro('')
+    setNovoPlanilhaOk('')
     try {
-      await cadastrarProduto({
-        codigo_ml: novoCodigoMl.trim().toUpperCase(),
-        descricao: novoDescricao.trim(),
-        fornecedor: novoFornecedor.trim(),
-        codigo_fornecedor: novoCodigoFornecedor.trim() || undefined,
-      })
+      let jaEstavaNoEstoque = false
+      try {
+        await cadastrarProduto({
+          codigo_ml: novoCodigoMl.trim().toUpperCase(),
+          descricao: novoDescricao.trim(),
+          fornecedor: novoFornecedor.trim(),
+          codigo_fornecedor: novoCodigoFornecedor.trim() || undefined,
+          // Cadastro pela etiqueta já nasce pronto para imprimir
+          ...(novoZpl ? { zpl: novoZpl } : {}),
+        })
+      } catch (e) {
+        // Produto já cadastrado no estoque não é motivo para abortar: ele pode
+        // ser antigo e nunca ter entrado na planilha. Segue para a planilha.
+        const msg = e instanceof Error ? e.message : String(e)
+        if (!/j[áa] existe/i.test(msg)) throw e
+        jaEstavaNoEstoque = true
+      }
+
       const qtdIni = parseInt(novoQtdInicial, 10)
       if (!isNaN(qtdIni) && qtdIni > 0) {
         await ajustarEstoque({
@@ -467,12 +607,28 @@ function TabEstoque() {
           observacao: 'Estoque inicial no cadastro',
         })
       }
-      setNovoProdSuccess(`Produto ${novoCodigoMl.trim().toUpperCase()} cadastrado!`)
       await carregarEstoque()
-      setTimeout(() => {
-        setNovoProdOpen(false)
-        setNovoProdSuccess('')
-      }, 1200)
+
+      // Estoque salvo. Agora a planilha — e se ela falhar, o modal FICA ABERTO
+      // mostrando o motivo. Fechar aqui dizendo "cadastrado!" criaria um
+      // produto que só existe na metade dos lugares, e o erro só apareceria
+      // como #N/A no próximo envio.
+      const planilhaOk = await salvarNaPlanilha(false)
+
+      const codigo = novoCodigoMl.trim().toUpperCase()
+      if (planilhaOk) {
+        setNovoProdSuccess(
+          jaEstavaNoEstoque
+            ? `${codigo} já existia no estoque — só acrescentei na planilha.`
+            : `Produto ${codigo} cadastrado!`
+        )
+        setTimeout(() => {
+          setNovoProdOpen(false)
+          setNovoProdSuccess('')
+        }, 1600)
+      } else {
+        setNovoProdSuccess(`${codigo} está no estoque, mas ainda não na planilha.`)
+      }
     } catch (err) {
       setNovoProdError(err instanceof Error ? err.message : 'Erro ao cadastrar produto.')
     } finally {
@@ -1411,15 +1567,66 @@ function TabEstoque() {
       {novoProdOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setNovoProdOpen(false)} />
-          <div className="relative bg-white border border-gray-200 rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl">
+          <div className="relative bg-white border border-gray-200 rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-gray-900 mb-1">Novo Produto</h3>
-            <p className="text-xs text-gray-400 mb-6">Cadastre um novo produto no sistema.</p>
+            <p className="text-xs text-gray-400 mb-4">
+              Cadastra no estoque e acrescenta na aba BANCO_DE_DADOS da planilha.
+            </p>
+
+            {/* Etiqueta x manual */}
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg mb-5">
+              <button
+                onClick={() => setNovoModo('etiqueta')}
+                className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                  novoModo === 'etiqueta'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Pela etiqueta
+              </button>
+              <button
+                onClick={() => setNovoModo('manual')}
+                className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                  novoModo === 'manual'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Digitar na mão
+              </button>
+            </div>
 
             {novoProdError && (
               <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-sm text-red-600">{novoProdError}</div>
             )}
             {novoProdSuccess && (
               <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-600">{novoProdSuccess}</div>
+            )}
+
+            {/* Cola da etiqueta */}
+            {novoModo === 'etiqueta' && (
+              <div className="mb-5">
+                <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">
+                  Cole a etiqueta do Mercado Livre
+                </label>
+                <textarea
+                  value={novoEtiquetaTexto}
+                  onChange={(e) => lerEtiquetaNovoProduto(e.target.value)}
+                  rows={4}
+                  placeholder="^XA^CI28&#10;^LH0,0&#10;^FO30,15^BY2,,0^BCN,54,N,N^FD..."
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[11px] text-gray-800 font-mono focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                />
+                {novoEtiquetaErro && (
+                  <p className="mt-2 text-xs text-red-600">{novoEtiquetaErro}</p>
+                )}
+                {novoLida && (
+                  <p className="mt-2 text-xs text-green-600">
+                    Etiqueta lida: <b className="font-mono">{novoCodigoMl}</b>. Confira os campos
+                    abaixo — o nome curto e a variação são palpites meus.
+                  </p>
+                )}
+              </div>
             )}
 
             <div className="space-y-4">
@@ -1463,6 +1670,64 @@ function TabEstoque() {
                   className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
                 />
               </div>
+
+              {/* O que vai para a planilha */}
+              <div className="pt-4 mt-1 border-t border-gray-100">
+                <p className="text-[11px] uppercase tracking-wider text-[#ff6a00] font-bold mb-1">
+                  Para a planilha
+                </p>
+                <p className="text-xs text-gray-400 mb-4">
+                  A aba BANCO_DE_DADOS usa nome curto em caixa alta, não o título do anúncio.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Nome curto</label>
+                    <input
+                      type="text"
+                      value={novoNomeCurto}
+                      onChange={(e) => setNovoNomeCurto(e.target.value)}
+                      placeholder="Ex: TRUE WHEY DARK CHOC"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 uppercase focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Variação</label>
+                    <input
+                      type="text"
+                      value={novoVariacao}
+                      onChange={(e) => setNovoVariacao(e.target.value)}
+                      placeholder="Ex: DARK CHOCOLATE"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 uppercase focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Itens por caixa</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={novoItensCaixa}
+                        onChange={(e) => setNovoItensCaixa(e.target.value)}
+                        placeholder="Ex: 4"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Peso unitário (kg)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={novoKgUnitario}
+                        onChange={(e) => setNovoKgUnitario(e.target.value)}
+                        placeholder="Ex: 1,00"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff6a00]/20 focus:border-[#ff6a00]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1.5">Quantidade Inicial (opcional)</label>
                 <input
@@ -1476,17 +1741,56 @@ function TabEstoque() {
               </div>
             </div>
 
+            {/* Resultado da planilha — separado do resultado do estoque */}
+            {novoPlanilhaOk && (
+              <div className="mt-5 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-700">
+                {novoPlanilhaOk}
+              </div>
+            )}
+            {novoPlanilhaErro && (
+              <div className="mt-5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                <p className="text-sm font-medium text-amber-900">
+                  O produto entrou no estoque, mas não na planilha
+                </p>
+                <p className="mt-1 font-mono text-[11px] leading-relaxed text-amber-800 break-words">
+                  {novoPlanilhaErro}
+                </p>
+                <p className="mt-2 text-xs text-amber-700">
+                  Enquanto não estiver na planilha, o PROCV da aba de envio devolve #N/A para
+                  este código.
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <button
+                    onClick={() => salvarNaPlanilha(false)}
+                    disabled={novoSalvandoPlanilha}
+                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-[#ff6a00] hover:bg-orange-600 text-white transition-colors disabled:opacity-50"
+                  >
+                    {novoSalvandoPlanilha ? 'Tentando...' : 'Tentar de novo'}
+                  </button>
+                  {novoPlanilhaErro.includes('ja esta na linha') && (
+                    <button
+                      onClick={() => salvarNaPlanilha(true)}
+                      disabled={novoSalvandoPlanilha}
+                      className="px-4 py-2 text-xs font-semibold rounded-lg border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                    >
+                      Atualizar a linha existente
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setNovoProdOpen(false)}
                 disabled={novoProdLoading}
                 className="px-5 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
-                Cancelar
+                {novoPlanilhaErro ? 'Fechar' : 'Cancelar'}
               </button>
               <button
                 onClick={handleNovoProduto}
-                disabled={novoProdLoading}
+                disabled={novoProdLoading || Boolean(novoPlanilhaErro)}
                 className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[#ff6a00] hover:bg-orange-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
               >
                 {novoProdLoading && (

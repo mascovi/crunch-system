@@ -25,10 +25,29 @@ export function ehCodigoML(codigo: string | null | undefined): boolean {
 
 export interface DadosEtiqueta {
   codigoMl: string
+  /** Descricao completa, com os separadores " | " trocados por espaco. */
   descricao: string
   fornecedor: string
   zpl: string
   etiquetasNoBloco: number
+  /**
+   * Pedacos da descricao original, separados pelo " | " do Mercado Livre.
+   * Vazio quando a etiqueta nao usa esse formato.
+   */
+  segmentos: string[]
+  /**
+   * Palpite para a coluna VARIACAO da planilha: o ultimo segmento, que no
+   * padrao do ML e onde mora o sabor/tamanho ("Pote 837gr Dark Chocolate").
+   * Vem vazio quando a etiqueta nao tem os separadores — nesse caso nao da
+   * para adivinhar sem chutar, e chute vira dado errado na planilha.
+   */
+  variacaoSugerida: string
+  /**
+   * Palpite para a coluna DESCRICAO da planilha, que usa nome curto em caixa
+   * alta ("TRUE WHEY DARK CHOC") em vez do titulo do anuncio. Sempre conferir
+   * antes de gravar.
+   */
+  nomeCurtoSugerido: string
 }
 
 /** Marcas conhecidas, para sugerir o fornecedor a partir da descricao. */
@@ -101,17 +120,26 @@ export function lerEtiquetaML(zplColado: string): DadosEtiqueta {
     throw new Error('Nao encontrei a descricao do produto na etiqueta.')
   }
 
-  // O ML separa partes da descricao com " | " — vira espaco simples
-  descricao = descricao.replace(/\s*\|\s*/g, ' ').replace(/\s+/g, ' ').trim()
+  // O ML separa partes da descricao com " | ". Guardamos os pedacos ANTES de
+  // juntar tudo: o ultimo deles e a variacao (sabor/tamanho), que a planilha
+  // precisa numa coluna propria.
+  const segmentos = descricao
+    .split('|')
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+
+  descricao = segmentos.join(' ').trim()
 
   // Fornecedor sugerido pela marca citada na descricao
   const emMaiusculas = descricao.toUpperCase()
   const marca = MARCAS.find((m) => emMaiusculas.includes(m.chave))
   const fornecedor = marca ? marca.nome : ''
 
-  // Guardar apenas o primeiro bloco ^XA...^XZ — a unidade de repeticao
-  const blocos = texto.match(/\^XA[\s\S]*?\^XZ/g)
-  const zpl = blocos && blocos.length > 0 ? blocos[0].trim() : texto
+  // So sugerimos variacao quando o ML de fato separou os campos. Com um
+  // segmento so nao da para saber onde acaba o produto e comeca o sabor.
+  const variacaoSugerida = segmentos.length >= 2 ? segmentos[segmentos.length - 1] : ''
+
+  const zpl = primeiroBloco(texto)
 
   return {
     codigoMl,
@@ -119,5 +147,58 @@ export function lerEtiquetaML(zplColado: string): DadosEtiqueta {
     fornecedor,
     zpl,
     etiquetasNoBloco: (zpl.match(/\^BC/g) || []).length,
+    segmentos,
+    variacaoSugerida,
+    nomeCurtoSugerido: montarNomeCurto(segmentos, descricao, marca?.nome || ''),
   }
+}
+
+/** Guarda apenas o primeiro bloco ^XA...^XZ — a unidade de repeticao. */
+function primeiroBloco(texto: string): string {
+  const blocos = texto.match(/\^XA[\s\S]*?\^XZ/g)
+  return blocos && blocos.length > 0 ? blocos[0].trim() : texto
+}
+
+/** Palavras que so ocupam espaco no nome curto da planilha. */
+const RUIDO = [
+  'suplemento',
+  'alimentar',
+  'vitaminico',
+  'vitamínico',
+  'em capsulas',
+  'em cápsulas',
+  'pote',
+  'sabor',
+  'de',
+  'da',
+  'do',
+  'com',
+  'e',
+  'em',
+]
+
+/**
+ * Monta um palpite de nome curto no estilo da coluna DESCRICAO da planilha:
+ * caixa alta, sem a marca (que ja vai na coluna FORNECEDOR) e sem palavras
+ * de enchimento. E so um ponto de partida — o nome final e sempre conferido
+ * na tela antes de ir para a planilha.
+ */
+function montarNomeCurto(segmentos: string[], descricao: string, marca: string): string {
+  // Com separadores, o miolo e o nome do produto e o fim e o sabor.
+  // Sem eles, sobra a descricao inteira.
+  const base =
+    segmentos.length >= 2 ? segmentos.slice(1).join(' ') : descricao
+
+  const semMarca = marca
+    ? base.replace(new RegExp(marca.replace(/\s+/g, '\\s*'), 'ig'), ' ')
+    : base
+
+  const palavras = semMarca
+    .replace(/[|]/g, ' ')
+    .split(/\s+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .filter((p) => !RUIDO.includes(p.toLowerCase()))
+
+  return palavras.join(' ').toUpperCase().slice(0, 45).trim()
 }

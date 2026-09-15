@@ -102,6 +102,182 @@ async function chamar(url: string, token: string, init?: RequestInit) {
   return dados
 }
 
+// ============================================
+// BANCO_DE_DADOS — a tabela de PROCV da planilha
+// ============================================
+
+/**
+ * A aba BANCO_DE_DADOS e a tabela que a aba de envio consulta por PROCV.
+ * O layout e fixo e o proprio cabecalho avisa "NAO ALTERAR":
+ *
+ *   A  indice sequencial
+ *   B  DESCRICAO             nome curto em caixa alta
+ *   C  FORNECEDOR
+ *   D  PART NUMBER ANUNCIO   codigo ML — e a chave da busca
+ *   E  VARIACAO              sabor/tamanho
+ *   F  ITENS POR VOLUME      quantas unidades cabem na caixa
+ *   G  Kg Unitario           TEXTO no formato "0,30 Kg", nao numero
+ *
+ * Duas armadilhas conhecidas, tratadas aqui:
+ *  1. Codigo repetido — o PROCV devolve so a primeira ocorrencia e ignora as
+ *     outras em silencio. Ja existem tres pares duplicados na planilha, entao
+ *     antes de acrescentar sempre procuramos o codigo.
+ *  2. Coluna G e texto. Gravar 0.3 como numero deixa a coluna mista.
+ */
+const ABA_BANCO = 'BANCO_DE_DADOS'
+/** Os dados comecam na linha 2; a 1 e o cabecalho. */
+const PRIMEIRA_LINHA_BANCO = 2
+
+export interface ProdutoBanco {
+  /** Nome curto, caixa alta — coluna B */
+  descricao: string
+  /** Coluna C */
+  fornecedor: string
+  /** Codigo ML — coluna D */
+  codigoMl: string
+  /** Coluna E */
+  variacao: string
+  /** Coluna F */
+  itensPorVolume: number
+  /** Coluna G, ja como numero. A formatacao "0,30 Kg" e feita aqui. */
+  kgUnitario: number
+}
+
+export interface ResultadoBanco {
+  ok: boolean
+  error?: string
+  /** Linha onde o produto foi gravado */
+  linha?: number
+  /** Indice sequencial atribuido na coluna A */
+  indice?: number
+  /** true quando o codigo ja existia e a linha foi atualizada */
+  atualizou?: boolean
+  /** Link direto para a linha */
+  url?: string
+}
+
+/** "0,30 Kg" — o formato exato que o resto da coluna usa. */
+function formatarKg(valor: number): string {
+  return `${valor.toFixed(2).replace('.', ',')} Kg`
+}
+
+/**
+ * Le a aba inteira e devolve as linhas ja indexadas, para a gente saber onde
+ * escrever e se o codigo ja existe.
+ */
+async function lerBanco(spreadsheetId: string, token: string) {
+  const dados = await chamar(
+    `${URL_API}/${spreadsheetId}/values/${encodeURIComponent(`${ABA_BANCO}!A:G`)}`,
+    token
+  )
+  const linhas: string[][] = dados.values || []
+
+  let ultimoIndice = 0
+  const primeiraVazia = Math.max(linhas.length + 1, PRIMEIRA_LINHA_BANCO)
+  const porCodigo = new Map<string, number>()
+
+  for (let i = PRIMEIRA_LINHA_BANCO - 1; i < linhas.length; i++) {
+    const linha = linhas[i] || []
+    const codigo = String(linha[3] || '').trim().toUpperCase()
+    if (codigo && !porCodigo.has(codigo)) {
+      // Guarda a PRIMEIRA ocorrencia: e ela que o PROCV enxerga
+      porCodigo.set(codigo, i + 1)
+    }
+    const indice = parseInt(String(linha[0] || '').trim(), 10)
+    if (!isNaN(indice) && indice > ultimoIndice) ultimoIndice = indice
+  }
+
+  return { linhas, ultimoIndice, primeiraVazia, porCodigo }
+}
+
+/**
+ * Acrescenta um produto na aba BANCO_DE_DADOS, ou atualiza a linha existente
+ * quando o codigo ML ja esta la.
+ *
+ * Nunca cria uma segunda linha para um codigo que ja existe: isso geraria
+ * mais uma duplicata invisivel ao PROCV.
+ */
+export async function salvarNoBancoDeDados(
+  produto: ProdutoBanco,
+  permitirAtualizar = true
+): Promise<ResultadoBanco> {
+  const { clientEmail, privateKey, spreadsheetId } = lerCredenciais()
+
+  const faltando = [
+    !clientEmail && 'GOOGLE_SHEETS_CLIENT_EMAIL',
+    !privateKey && 'GOOGLE_SHEETS_PRIVATE_KEY',
+    !spreadsheetId && 'GOOGLE_SHEETS_ID',
+  ].filter(Boolean)
+
+  if (faltando.length > 0) {
+    return { ok: false, error: `Variavel de ambiente ausente: ${faltando.join(', ')}` }
+  }
+
+  const codigo = produto.codigoMl.trim().toUpperCase()
+  if (!codigo) return { ok: false, error: 'Codigo ML vazio.' }
+
+  try {
+    const token = await obterToken(clientEmail, privateKey)
+    const { ultimoIndice, primeiraVazia, porCodigo } = await lerBanco(spreadsheetId, token)
+
+    const jaExiste = porCodigo.get(codigo)
+
+    if (jaExiste && !permitirAtualizar) {
+      return {
+        ok: false,
+        error: `O codigo ${codigo} ja esta na linha ${jaExiste} da aba ${ABA_BANCO}.`,
+      }
+    }
+
+    const linha = jaExiste || primeiraVazia
+    const indice = jaExiste ? undefined : ultimoIndice + 1
+
+    // Quando atualiza, nao mexe na coluna A: a numeracao existente e do Pedro
+    const range = jaExiste
+      ? `${ABA_BANCO}!B${linha}:G${linha}`
+      : `${ABA_BANCO}!A${linha}:G${linha}`
+
+    const valores = jaExiste
+      ? [
+          [
+            produto.descricao,
+            produto.fornecedor,
+            codigo,
+            produto.variacao,
+            produto.itensPorVolume,
+            formatarKg(produto.kgUnitario),
+          ],
+        ]
+      : [
+          [
+            indice,
+            produto.descricao,
+            produto.fornecedor,
+            codigo,
+            produto.variacao,
+            produto.itensPorVolume,
+            formatarKg(produto.kgUnitario),
+          ],
+        ]
+
+    await chamar(
+      `${URL_API}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+      token,
+      { method: 'PUT', body: JSON.stringify({ range, values: valores }) }
+    )
+
+    return {
+      ok: true,
+      linha,
+      indice,
+      atualizou: Boolean(jaExiste),
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 /** Nome da aba nova: "ENVIO 11-09 14h32". Nunca colide entre envios. */
 function nomeDaAba(): string {
   const agora = new Date()
