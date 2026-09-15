@@ -51,6 +51,73 @@ export async function atualizarFornecedor(
 }
 
 /**
+ * Renomeia o nome fantasia de um fornecedor E propaga a mudanca.
+ *
+ * POR QUE PRECISA PROPAGAR:
+ * O nome fantasia nao e uma chave estrangeira — ele e copiado como TEXTO
+ * para outras duas tabelas no momento em que a NF entra:
+ *
+ *   notas_fiscais.fornecedor  ← gravado em salvarNotaFiscal
+ *   produtos.fornecedor       ← gravado no mesmo fluxo
+ *
+ * Renomear so a linha de `fornecedores` deixaria as duas apontando para um
+ * nome que nao existe mais. O efeito e silencioso e feio: buscarNFsPorFornecedor
+ * passa a devolver zero notas, a coluna Fornecedor do estoque continua exibindo
+ * o nome velho e o filtro de fornecedor separa o mesmo fornecedor em dois.
+ *
+ * Por isso a troca acontece nas tres tabelas, sempre junta.
+ */
+export async function renomearFornecedor(
+  id: string,
+  nomeAntigo: string,
+  nomeNovo: string
+): Promise<{ notas: number; produtos: number }> {
+  const antigo = nomeAntigo.trim()
+  const novo = nomeNovo.trim()
+
+  if (!novo) throw new Error('O nome fantasia nao pode ficar vazio.')
+  if (antigo === novo) return { notas: 0, produtos: 0 }
+
+  // 1. O cadastro do fornecedor
+  const { error: erroFornecedor } = await supabase
+    .from('fornecedores')
+    .update({ nome_fantasia: novo })
+    .eq('id', id)
+
+  if (erroFornecedor) {
+    throw new Error(`Erro ao renomear fornecedor: ${erroFornecedor.message}`)
+  }
+
+  // 2. As notas fiscais que carregam o nome antigo
+  const { data: notas, error: erroNotas } = await supabase
+    .from('notas_fiscais')
+    .update({ fornecedor: novo })
+    .eq('fornecedor', antigo)
+    .select('id')
+
+  if (erroNotas) {
+    throw new Error(
+      `O fornecedor foi renomeado, mas as notas fiscais ficaram com o nome antigo: ${erroNotas.message}`
+    )
+  }
+
+  // 3. Os produtos
+  const { data: produtos, error: erroProdutos } = await supabase
+    .from('produtos')
+    .update({ fornecedor: novo })
+    .eq('fornecedor', antigo)
+    .select('codigo_ml')
+
+  if (erroProdutos) {
+    throw new Error(
+      `O fornecedor e as notas foram renomeados, mas os produtos ficaram com o nome antigo: ${erroProdutos.message}`
+    )
+  }
+
+  return { notas: notas?.length || 0, produtos: produtos?.length || 0 }
+}
+
+/**
  * Busca todas as NFs vinculadas a um fornecedor pelo nome_fantasia.
  */
 export async function buscarNFsPorFornecedor(nomeFantasia: string) {

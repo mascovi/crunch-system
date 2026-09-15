@@ -11,7 +11,7 @@ import { lerEtiquetaML, ehCodigoML } from '@/lib/etiqueta-ml'
 import { extrairFull } from '@/lib/preparar-full'
 import TabPrepararFull from '@/components/TabPrepararFull'
 import type { SaldoEstoque, EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader, MotivoAjuste, EstoqueMovimentacao, Fornecedor } from '@/types'
-import { listarFornecedoresCompleto, atualizarFornecedor, buscarNFsPorFornecedor } from '@/services/fornecedores'
+import { listarFornecedoresCompleto, atualizarFornecedor, buscarNFsPorFornecedor, renomearFornecedor } from '@/services/fornecedores'
 import { buscarEstatisticasEntrega, buscarNFsComEstimativa } from '@/services/entregas'
 import type { EstatisticaTransportadora, NFEmTransitoEstimativa } from '@/services/entregas'
 
@@ -2012,7 +2012,7 @@ function TabEstoque() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">CNPJ *</label>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">CNPJ</label>
                       <input
                         type="text"
                         value={fornecedorForm.cnpj}
@@ -2022,7 +2022,7 @@ function TabEstoque() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Telefone *</label>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Telefone</label>
                       <input
                         type="text"
                         value={fornecedorForm.telefone}
@@ -2032,7 +2032,7 @@ function TabEstoque() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email *</label>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email</label>
                       <input
                         type="email"
                         value={fornecedorForm.email}
@@ -2042,7 +2042,7 @@ function TabEstoque() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Endereço *</label>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Endereço</label>
                       <input
                         type="text"
                         value={fornecedorForm.endereco}
@@ -2076,22 +2076,50 @@ function TabEstoque() {
                     <button
                       onClick={async () => {
                         if (!fornecedorEdit) return
-                        if (!fornecedorForm.razao_social.trim() || !fornecedorForm.nome_fantasia.trim() || !fornecedorForm.cnpj.trim() || !fornecedorForm.endereco.trim() || !fornecedorForm.telefone.trim() || !fornecedorForm.email.trim()) {
-                          setFornecedorError('Todos os campos marcados com * são obrigatórios.')
+                        // Só razão social e nome fantasia são obrigatórios.
+                        // Fornecedor criado automaticamente pelo XML nasce sem
+                        // CNPJ, endereço, telefone e e-mail — exigir tudo isso
+                        // impedia justamente o que mais se precisa fazer aqui,
+                        // que é corrigir o apelido.
+                        if (!fornecedorForm.razao_social.trim() || !fornecedorForm.nome_fantasia.trim()) {
+                          setFornecedorError('Razão social e nome fantasia são obrigatórios.')
                           return
                         }
                         setFornecedorSaving(true)
                         setFornecedorError('')
                         try {
-                          await atualizarFornecedor(fornecedorEdit.id, fornecedorForm)
-                          setFornecedorSuccess('Fornecedor atualizado com sucesso!')
+                          const nomeAntigo = (fornecedorEdit.nome_fantasia || '').trim()
+                          const nomeNovo = fornecedorForm.nome_fantasia.trim()
+                          const renomeou = nomeAntigo !== nomeNovo
+
+                          // O nome fantasia é copiado como texto para notas_fiscais
+                          // e produtos. Renomear sem propagar quebraria o vínculo
+                          // com o histórico, e em silêncio.
+                          let propagacao = { notas: 0, produtos: 0 }
+                          if (renomeou && nomeAntigo) {
+                            propagacao = await renomearFornecedor(fornecedorEdit.id, nomeAntigo, nomeNovo)
+                          }
+
+                          await atualizarFornecedor(fornecedorEdit.id, {
+                            ...fornecedorForm,
+                            nome_fantasia: nomeNovo,
+                          })
+
+                          setFornecedorSuccess(
+                            renomeou && (propagacao.notas > 0 || propagacao.produtos > 0)
+                              ? `Renomeado para ${nomeNovo}. Atualizei também ${propagacao.notas} nota${propagacao.notas === 1 ? '' : 's'} e ${propagacao.produtos} produto${propagacao.produtos === 1 ? '' : 's'}.`
+                              : 'Fornecedor atualizado com sucesso!'
+                          )
                           const updated = await listarFornecedoresCompleto()
                           setFornecedoresList(updated)
+                          // O estoque exibe o nome fantasia; recarrega para não
+                          // ficar mostrando o nome antigo até o próximo F5
+                          if (renomeou) await carregarEstoque()
                           setTimeout(() => {
                             setFornecedorView('list')
                             setFornecedorEdit(null)
                             setFornecedorSuccess('')
-                          }, 1200)
+                          }, renomeou ? 2200 : 1200)
                         } catch (err) {
                           setFornecedorError(err instanceof Error ? err.message : 'Erro ao salvar.')
                         } finally {
