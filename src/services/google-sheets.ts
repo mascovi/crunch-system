@@ -163,6 +163,55 @@ export interface ResultadoBanco {
 }
 
 /**
+ * Devolve o nome curto de cada produto, indexado pelo codigo ML.
+ *
+ * Os nomes curtos NAO sao gerados por algoritmo: sao os que o Pedro ja
+ * mantem na coluna DESCRICAO do BANCO_DE_DADOS. Nenhuma heuristica tiraria
+ * "TRIMAG" de "Bio Trimag Puravida - 3 Tipos De Magnesio - 60 Caps Softgels
+ * Sabor Sem" — isso e julgamento humano, entao a fonte e a planilha.
+ *
+ * Produto fora da planilha simplesmente nao aparece no mapa, e a tela cai
+ * de volta para o titulo do anuncio.
+ */
+export async function lerNomesCurtos(): Promise<{
+  ok: boolean
+  error?: string
+  nomes?: Record<string, string>
+}> {
+  const { clientEmail, privateKey, spreadsheetId } = lerCredenciais()
+
+  if (!clientEmail || !privateKey || !spreadsheetId) {
+    return { ok: false, error: 'Credenciais do Google Sheets ausentes.' }
+  }
+
+  try {
+    const token = await obterToken(clientEmail, privateKey)
+    const dados = await chamar(
+      `${URL_API}/${spreadsheetId}/values/${encodeURIComponent(`${ABA_BANCO}!B:D`)}`,
+      token
+    )
+    const linhas: string[][] = dados.values || []
+    const nomes: Record<string, string> = {}
+
+    for (let i = PRIMEIRA_LINHA_BANCO - 1; i < linhas.length; i++) {
+      const linha = linhas[i] || []
+      // O intervalo comeca na coluna B, entao: [0]=DESCRICAO, [2]=codigo ML
+      const nomeCurto = String(linha[0] || '').trim()
+      const codigo = String(linha[2] || '').trim().toUpperCase()
+      // Primeira ocorrencia vence, igual ao PROCV da planilha — assim a tela
+      // mostra o mesmo nome que a aba de envio usaria
+      if (codigo && nomeCurto && !nomes[codigo]) {
+        nomes[codigo] = nomeCurto
+      }
+    }
+
+    return { ok: true, nomes }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/**
  * Copia SO A FORMATACAO da linha de cima para a linha nova (colunas A a G).
  * E isso que faz o "Kg" aparecer na coluna G sem que ele seja texto: o
  * sufixo vem da mascara de numero da celula, que e formatacao.

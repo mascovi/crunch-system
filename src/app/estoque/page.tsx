@@ -119,6 +119,12 @@ function TabEstoque() {
   const [filtroFornecedor, setFiltroFornecedor] = useState('')
   /** Produtos zerados ficam escondidos até você pedir para ver. */
   const [mostrarZerados, setMostrarZerados] = useState(false)
+  /**
+   * Nome curto por código ML, vindo da coluna DESCRIÇÃO do BANCO_DE_DADOS.
+   * Carrega depois da tabela, sem travar a tela: se a planilha demorar ou
+   * falhar, o estoque continua aparecendo com o título do anúncio.
+   */
+  const [nomesCurtos, setNomesCurtos] = useState<Record<string, string>>({})
 
   // Modal Ajuste
   const [ajusteOpen, setAjusteOpen] = useState(false)
@@ -229,6 +235,17 @@ function TabEstoque() {
     carregarEstoque()
   }, [carregarEstoque])
 
+  // Nomes curtos da planilha — em paralelo, nunca bloqueando a tabela
+  useEffect(() => {
+    fetch('/api/sheets/nomes-curtos')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok && d.nomes) setNomesCurtos(d.nomes)
+        else console.warn('[nomes curtos] indisponíveis:', d.error)
+      })
+      .catch((e) => console.warn('[nomes curtos] falha ao buscar:', e))
+  }, [])
+
   // Fornecedores
   const fornecedores = Array.from(
     new Set(estoque.map((item) => item.fornecedor_principal).filter(Boolean))
@@ -237,9 +254,14 @@ function TabEstoque() {
   // Filtro + busca
   const filtrado = useMemo(() => {
     const items = estoque.filter((item) => {
+      const alvo = busca.toLowerCase()
+      // Busca também pelo nome curto: quem vê "WHEY VEGAN PAÇOCA" na tela
+      // digita isso, e não o título do anúncio que está lá embaixo.
+      const nomeCurto = nomesCurtos[item.codigo_ml.toUpperCase()] || ''
       const matchBusca =
-        item.codigo_ml.toLowerCase().includes(busca.toLowerCase()) ||
-        item.produto.toLowerCase().includes(busca.toLowerCase())
+        item.codigo_ml.toLowerCase().includes(alvo) ||
+        item.produto.toLowerCase().includes(alvo) ||
+        nomeCurto.toLowerCase().includes(alvo)
       const matchFornecedor = !filtroFornecedor || item.fornecedor_principal === filtroFornecedor
       // Zerados ficam fora por padrão: a lista do dia a dia é do que existe.
       // Quando a busca é por um código específico, mostra mesmo zerado — quem
@@ -270,7 +292,7 @@ function TabEstoque() {
     })
 
     return items
-  }, [estoque, busca, filtroFornecedor, sortCol, sortDir, mostrarZerados])
+  }, [estoque, busca, filtroFornecedor, sortCol, sortDir, mostrarZerados, nomesCurtos])
 
   // KPIs
   const totalSKUs = estoque.length
@@ -1106,6 +1128,8 @@ function TabEstoque() {
                   // Código que não tem formato ML veio do XML como código do
                   // fornecedor — o produto ainda precisa do código ML de verdade.
                   const semCodigoML = !ehCodigoML(item.codigo_ml)
+                  // Nome curto da planilha. Sem ele, cai no título do anúncio.
+                  const nomeCurto = nomesCurtos[item.codigo_ml.toUpperCase()] || ''
                   return (
                     <tr
                       key={item.codigo_ml}
@@ -1129,8 +1153,22 @@ function TabEstoque() {
                           </span>
                         )}
                       </td>
-                      <td className={`px-4 py-3 max-w-[220px] font-medium ${semCodigoML ? 'text-red-800' : 'text-gray-700'}`}>
-                        <span className="block leading-tight text-sm">{item.produto}</span>
+                      <td className={`px-4 py-3 max-w-[260px] font-medium ${semCodigoML ? 'text-red-800' : 'text-gray-700'}`}>
+                        {nomeCurto ? (
+                          <>
+                            <span className="block leading-tight text-sm font-semibold uppercase">
+                              {nomeCurto}
+                            </span>
+                            <span
+                              className="block text-[11px] leading-snug text-gray-400 mt-0.5 font-normal truncate"
+                              title={item.produto}
+                            >
+                              {item.produto}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="block leading-tight text-sm">{item.produto}</span>
+                        )}
                         {semCodigoML && (
                           <span className="block text-[11px] text-red-600 mt-0.5 font-mono">
                             código atual: {item.codigo_ml}
