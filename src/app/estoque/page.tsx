@@ -21,9 +21,7 @@ interface MovimentacaoEnriquecida extends EstoqueMovimentacao {
 }
 import ConfirmModal from '@/components/ConfirmModal'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-  PieLabelRenderProps,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList,
 } from 'recharts'
 
 type Tab = 'estoque' | 'preparar-full' | 'enviar-full' | 'historico' | 'entregas'
@@ -36,8 +34,6 @@ const MOTIVOS: { value: MotivoAjuste; label: string }[] = [
   { value: 'CORRECAO_INVENTARIO', label: 'Correção de inventário' },
   { value: 'OUTRO', label: 'Outro' },
 ]
-
-const PIE_COLORS = ['#ff6a00', '#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#c2410c', '#9a3412']
 
 export default function EstoquePage() {
   const [tab, setTab] = useState<Tab>('estoque')
@@ -295,34 +291,25 @@ function TabEstoque() {
   }, [estoque, busca, filtroFornecedor, sortCol, sortDir, mostrarZerados, nomesCurtos])
 
   // KPIs
-  const totalSKUs = estoque.length
+  // SKUs com saldo, não cadastrados: produto zerado não é estoque, é cadastro.
+  const totalSKUs = estoque.filter((i) => i.quantidade_disponivel > 0).length
   const totalUnidades = estoque.reduce((s, i) => s + i.quantidade_disponivel, 0)
   const valorTotal = estoque.reduce((s, i) => s + (i.preco_compra * Math.max(0, i.quantidade_disponivel)), 0)
   const alertaCount = estoque.filter((i) => i.quantidade_disponivel < 10).length
   const zeradoCount = estoque.filter((i) => i.quantidade_disponivel <= 0).length
 
-  // Chart: distribuição por fornecedor
+  // Unidades por fornecedor. Saldo negativo não entra na soma: ele é erro de
+  // inventário, e somar negativo faria um fornecedor parecer menor do que é.
   const chartFornecedor = useMemo(() => {
     const mapa = new Map<string, number>()
     estoque.forEach((i) => {
       const f = i.fornecedor_principal || 'Sem fornecedor'
-      mapa.set(f, (mapa.get(f) || 0) + i.quantidade_disponivel)
+      mapa.set(f, (mapa.get(f) || 0) + Math.max(0, i.quantidade_disponivel))
     })
     return Array.from(mapa.entries())
       .map(([name, value]) => ({ name, value }))
+      .filter((f) => f.value > 0)
       .sort((a, b) => b.value - a.value)
-  }, [estoque])
-
-  // Chart: top 10 produtos por quantidade
-  const chartTopProdutos = useMemo(() => {
-    return [...estoque]
-      .sort((a, b) => b.quantidade_disponivel - a.quantidade_disponivel)
-      .slice(0, 10)
-      .map((i) => ({
-        name: i.produto.length > 25 ? i.produto.substring(0, 25) + '...' : i.produto,
-        qtd: i.quantidade_disponivel,
-        fullName: i.produto,
-      }))
   }, [estoque])
 
   const formatDate = (dateStr: string) => {
@@ -880,7 +867,9 @@ function TabEstoque() {
             </div>
           </div>
           <div className="text-2xl font-bold text-gray-900">{totalSKUs}</div>
-          <p className="text-xs text-gray-400 mt-1">produtos cadastrados</p>
+          <p className="text-xs text-gray-400 mt-1">
+            com saldo{estoque.length > totalSKUs ? ` · ${estoque.length} cadastrados` : ''}
+          </p>
         </div>
 
         {/* Total Unidades */}
@@ -922,55 +911,38 @@ function TabEstoque() {
         </div>
       </div>
 
-      {/* ========== CHARTS ========== */}
-      {estoque.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Bar: Top 10 Produtos */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Top 10 Produtos por Quantidade</h3>
-            <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartTopProdutos} layout="vertical" margin={{ left: 10, right: 20, top: 0, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
-                    formatter={(value) => [String(value), 'Qtd']}
-                  />
-                  <Bar dataKey="qtd" fill="#ff6a00" radius={[0, 4, 4, 0]} barSize={18} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Pie: Distribuição por Fornecedor */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Distribuição por Fornecedor</h3>
-            <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartFornecedor}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={90}
-                    paddingAngle={3}
+      {/* ========== UNIDADES POR FORNECEDOR ========== */}
+      {chartFornecedor.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 px-5 py-4 shadow-sm">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            Unidades por fornecedor
+          </h3>
+          <div style={{ height: chartFornecedor.length * 30 + 10 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={chartFornecedor}
+                layout="vertical"
+                margin={{ left: 0, right: 40, top: 0, bottom: 0 }}
+              >
+                <XAxis type="number" hide />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={130}
+                  tick={{ fontSize: 11, fill: '#6b7280' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Bar dataKey="value" fill="#ff6a00" radius={[0, 4, 4, 0]} barSize={14}>
+                  <LabelList
                     dataKey="value"
-                    label={(props: PieLabelRenderProps) => `${props.name || ''} (${((props.percent || 0) * 100).toFixed(0)}%)`}
-                    labelLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
-                  >
-                    {chartFornecedor.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
-                    formatter={(value) => [String(value), 'unidades']}
+                    position="right"
+                    style={{ fontSize: 11, fill: '#6b7280' }}
+                    formatter={(v: number) => v.toLocaleString('pt-BR')}
                   />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
