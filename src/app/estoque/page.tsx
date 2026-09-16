@@ -1159,10 +1159,7 @@ function TabEstoque() {
                             <span className="block leading-tight text-sm font-semibold uppercase">
                               {nomeCurto}
                             </span>
-                            <span
-                              className="block text-[11px] leading-snug text-gray-400 mt-0.5 font-normal truncate"
-                              title={item.produto}
-                            >
+                            <span className="block text-[11px] leading-snug text-gray-400 mt-0.5 font-normal">
                               {item.produto}
                             </span>
                           </>
