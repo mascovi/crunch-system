@@ -934,11 +934,13 @@ function TabEstoque() {
                   tickLine={false}
                 />
                 <Bar dataKey="value" fill="#ff6a00" radius={[0, 4, 4, 0]} barSize={14}>
+                  {/* O formatter do recharts recebe ReactNode, não number —
+                      tipar como number quebra o build. Converte aqui. */}
                   <LabelList
                     dataKey="value"
                     position="right"
                     style={{ fontSize: 11, fill: '#6b7280' }}
-                    formatter={(v: number) => v.toLocaleString('pt-BR')}
+                    formatter={(v) => Number(v || 0).toLocaleString('pt-BR')}
                   />
                 </Bar>
               </BarChart>
