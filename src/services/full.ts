@@ -115,6 +115,74 @@ export async function listarEnviosFull(): Promise<EnvioFull[]> {
 }
 
 /**
+ * Desfaz um envio FULL por completo, devolvendo os itens ao estoque.
+ *
+ * COMO O ESTOQUE VOLTA SOZINHO:
+ * O saldo nao e um numero guardado — ele e a soma das movimentacoes
+ * (entradas menos saidas). Apagar as movimentacoes de SAIDA que este envio
+ * gerou ja recoloca a quantidade no saldo. Nao existe, e nao deve existir,
+ * um "update quantidade" em lugar nenhum.
+ *
+ * ORDEM DAS EXCLUSOES:
+ * Movimentacoes e itens apontam para o envio, entao o envio e o ultimo a
+ * sair. Se algo falhar no meio, o que ja foi desfeito e justamente a parte
+ * que mais importa (o estoque volta), e o registro do envio continua
+ * visivel na tela para voce terminar a limpeza.
+ *
+ * ISSO APAGA, NAO ESTORNA: o envio some do historico como se nunca tivesse
+ * existido. Se um dia a auditoria importar mais que a limpeza, o caminho e
+ * lancar movimentacoes de ENTRADA compensatorias e marcar o envio como
+ * cancelado, em vez de apagar.
+ */
+export async function excluirEnvioFull(envioId: string): Promise<{
+  itensDevolvidos: number
+  unidadesDevolvidas: number
+}> {
+  if (!envioId) throw new Error('Envio nao informado.')
+
+  // Fotografa o que vai voltar, para conseguir relatar depois
+  const itens = await buscarItensEnvio(envioId)
+  const unidades = itens.reduce((s, i) => s + (i.quantidade || 0), 0)
+
+  // 1. As saidas de estoque — e isso que devolve o saldo
+  const { error: erroMov } = await supabase
+    .from('estoque_movimentacoes')
+    .delete()
+    .eq('referencia_id', envioId)
+    .eq('origem', 'ENVIO_FULL')
+
+  if (erroMov) {
+    throw new Error(`Nada foi alterado. Erro ao remover as saidas: ${erroMov.message}`)
+  }
+
+  // 2. Os itens do envio
+  const { error: erroItens } = await supabase
+    .from('envios_full_itens')
+    .delete()
+    .eq('envio_id', envioId)
+
+  if (erroItens) {
+    throw new Error(
+      `O estoque JA foi devolvido, mas os itens do envio nao saíram: ${erroItens.message}`
+    )
+  }
+
+  // 3. O envio
+  const { error: erroEnvio } = await supabase
+    .from('envios_full')
+    .delete()
+    .eq('id', envioId)
+
+  if (erroEnvio) {
+    throw new Error(
+      `O estoque JA foi devolvido e os itens removidos, mas o envio continua no historico: ${erroEnvio.message}`
+    )
+  }
+
+  return { itensDevolvidos: itens.length, unidadesDevolvidas: unidades }
+}
+
+/**
  * Busca itens de um envio FULL específico.
  */
 export async function buscarItensEnvio(envioId: string): Promise<EnvioFullItem[]> {

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
 import { listarEstoque, ajustarEstoque, cadastrarProduto, buscarHistoricoCodigo, atualizarProduto } from '@/services/estoque'
-import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio } from '@/services/full'
+import { validarCSVFull, processarEnvioFull, listarEnviosFull, buscarItensEnvio, excluirEnvioFull } from '@/services/full'
 import { supabase } from '@/lib/supabase'
 import { montarZplParaImpressao } from '@/lib/zpl'
 import { lerEtiquetaML, ehCodigoML } from '@/lib/etiqueta-ml'
@@ -2788,20 +2788,50 @@ function TabHistorico() {
   const [expandido, setExpandido] = useState<string | null>(null)
   const [itensEnvio, setItensEnvio] = useState<EnvioFullItem[]>([])
   const [loadingItens, setLoadingItens] = useState(false)
+  // Desfazer envio
+  const [excluindo, setExcluindo] = useState<string | null>(null)
+  const [desfazendo, setDesfazendo] = useState(false)
+  const [erroExclusao, setErroExclusao] = useState('')
+
+  const carregar = async () => {
+    try {
+      const data = await listarEnviosFull()
+      setEnvios(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const carregar = async () => {
-      try {
-        const data = await listarEnviosFull()
-        setEnvios(data)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
     carregar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * Desfaz o envio e devolve o estoque.
+   *
+   * Só aparece no envio mais recente de propósito: desfazer um envio antigo
+   * quase sempre significa que o certo era corrigir por ajuste de inventário,
+   * não apagar histórico que já foi usado em conferência.
+   */
+  const desfazerEnvio = async (envioId: string) => {
+    setDesfazendo(true)
+    setErroExclusao('')
+    try {
+      const r = await excluirEnvioFull(envioId)
+      console.log('[Envio FULL] desfeito:', r)
+      setExcluindo(null)
+      setExpandido(null)
+      setItensEnvio([])
+      await carregar()
+    } catch (e) {
+      setErroExclusao(e instanceof Error ? e.message : 'Erro ao desfazer o envio.')
+    } finally {
+      setDesfazendo(false)
+    }
+  }
 
   const toggleEnvio = async (envioId: string) => {
     if (expandido === envioId) {
@@ -2910,6 +2940,59 @@ function TabHistorico() {
                       ))}
                     </tbody>
                   </table>
+                )}
+
+                {/* Desfazer — só no envio mais recente */}
+                {envios[0]?.id === envio.id && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    {excluindo === envio.id ? (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                        <p className="text-sm font-semibold text-red-900">
+                          Desfazer este envio e devolver {envio.total_itens} unidade
+                          {envio.total_itens > 1 ? 's' : ''} ao estoque?
+                        </p>
+                        <p className="text-xs text-red-700 mt-1">
+                          O envio some do histórico e as saídas de estoque são apagadas. Não dá
+                          para desfazer isso pela tela.
+                        </p>
+                        <div className="flex items-center gap-3 mt-3">
+                          <button
+                            onClick={() => desfazerEnvio(envio.id)}
+                            disabled={desfazendo}
+                            className="px-4 py-2 text-xs font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                          >
+                            {desfazendo ? 'Desfazendo...' : 'Sim, desfazer o envio'}
+                          </button>
+                          <button
+                            onClick={() => setExcluindo(null)}
+                            disabled={desfazendo}
+                            className="px-4 py-2 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-white disabled:opacity-50 transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setExcluindo(envio.id)
+                          setErroExclusao('')
+                        }}
+                        className="text-xs text-gray-400 hover:text-red-600 transition-colors"
+                      >
+                        Desfazer este envio e devolver ao estoque
+                      </button>
+                    )}
+
+                    {erroExclusao && (
+                      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                        <p className="text-sm font-medium text-red-900">Não consegui desfazer</p>
+                        <p className="mt-1 font-mono text-[11px] leading-relaxed text-red-800 break-words">
+                          {erroExclusao}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
