@@ -49,11 +49,18 @@ export async function processarEnvioFull(
     }
   }
 
+  // A data do envio é a do CSV quando ela existe, não a de hoje. Envio
+  // lançado com atraso tem que aparecer no histórico na data em que saiu,
+  // senão a conferência com o Mercado Livre não fecha.
+  const dataDoEnvio = dataEnvioCSV
+    ? new Date(`${dataEnvioCSV}T12:00:00`).toISOString()
+    : new Date().toISOString()
+
   // Criar envio
   const { data: envio, error: envioError } = await supabase
     .from('envios_full')
     .insert({
-      data_envio: new Date().toISOString(),
+      data_envio: dataDoEnvio,
       total_itens: totalItens,
       total_codigos: totalCodigos,
       codigo_envio_ml: header?.codigo_envio_ml || null,
@@ -81,7 +88,7 @@ export async function processarEnvioFull(
 
   if (itensError) throw new Error(`Envio criado mas erro nos itens: ${itensError.message}`)
 
-  // Gerar movimentações de saída
+  // Gerar movimentações de saída, na mesma data do envio
   const movimentacoes = itens.map((item) => ({
     codigo_ml: item.codigo_ml,
     produto: item.descricao || item.codigo_ml,
@@ -89,7 +96,7 @@ export async function processarEnvioFull(
     quantidade: item.quantidade,
     origem: 'ENVIO_FULL',
     referencia_id: envio.id,
-    data: new Date().toISOString(),
+    data: dataDoEnvio,
   }))
 
   const { error: movError } = await supabase

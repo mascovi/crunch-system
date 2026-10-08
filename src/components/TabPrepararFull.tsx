@@ -30,6 +30,12 @@ export default function TabPrepararFull() {
   const [dandoBaixa, setDandoBaixa] = useState(false)
   const [baixaErro, setBaixaErro] = useState('')
   const [baixaFeita, setBaixaFeita] = useState<{ total: number; codigos: number } | null>(null)
+  /**
+   * Data do envio, no formato do campo date. Começa hoje, mas é editável:
+   * envio lançado com atraso precisa entrar no histórico na data em que
+   * saiu de verdade, senão a conferência com o ML não fecha.
+   */
+  const [dataEnvio, setDataEnvio] = useState(() => new Date().toISOString().slice(0, 10))
 
   /**
    * Um clique só: extrai do texto, cruza com o estoque, cria a aba na planilha
@@ -125,8 +131,9 @@ export default function TabPrepararFull() {
     setDandoBaixa(true)
     setBaixaErro('')
     try {
-      const hoje = new Date()
-      const dataBR = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`
+      // O serviço espera DD/MM/YYYY; o input date entrega YYYY-MM-DD
+      const [ano, mes, dia] = dataEnvio.split('-')
+      const dataBR = `${dia}/${mes}/${ano}`
 
       const envio = await processarEnvioFull(
         itens.map((i) => ({
@@ -443,8 +450,12 @@ export default function TabPrepararFull() {
                   Confirmar a baixa de {itens.reduce((s, i) => s + i.quantidade, 0).toLocaleString('pt-BR')} unidades?
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Isso gera saída no estoque dos {itens.length} produtos da lista e registra o envio no
-                  histórico. Não dá para desfazer pela tela.
+                  Isso gera saída no estoque dos {itens.length} produtos da lista e registra o envio
+                  no histórico com a data{' '}
+                  <b className="text-gray-700">
+                    {dataEnvio.split('-').reverse().join('/')}
+                  </b>
+                  .
                 </p>
                 {itens.some((i) => i.saldo !== null && i.saldo < i.quantidade) && (
                   <p className="mt-2 text-xs text-amber-700">
@@ -470,12 +481,21 @@ export default function TabPrepararFull() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-end justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Dar baixa no estoque</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-gray-500 mt-0.5 mb-3">
                     Registra o envio FULL e desconta as quantidades do saldo.
                   </p>
+                  <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                    Data do envio
+                  </label>
+                  <input
+                    type="date"
+                    value={dataEnvio}
+                    onChange={(e) => setDataEnvio(e.target.value)}
+                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#ff6a00] focus:ring-1 focus:ring-[#ff6a00]"
+                  />
                 </div>
                 <button
                   onClick={() => setConfirmandoBaixa(true)}
