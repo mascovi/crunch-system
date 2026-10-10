@@ -322,6 +322,14 @@ export default function TabPrepararFull() {
                         </td>
                         <td className="px-4 py-3 text-center font-semibold text-gray-900">
                           {item.quantidade}
+                          {/* Detalhe do envio: avisa quando o ML contou
+                              diferente do que foi declarado */}
+                          {item.declaradas !== undefined &&
+                            item.declaradas !== item.quantidade && (
+                              <span className="block text-[10px] font-normal text-amber-600 mt-0.5">
+                                declarou {item.declaradas}
+                              </span>
+                            )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {naoExiste ? (
