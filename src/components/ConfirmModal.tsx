@@ -36,7 +36,11 @@ export default function ConfirmModal({
       {/* Modal */}
       <div className="relative bg-crunch-panel border border-crunch-line rounded-2xl p-8 max-w-md w-full mx-4 animate-fade-in-up">
         <h3 className="text-xl font-semibold mb-3">{title}</h3>
-        <p className="text-crunch-ink-dim text-sm mb-8 leading-relaxed">{message}</p>
+        {/* whitespace-pre-line: alguns avisos vêm em várias linhas (lista de
+            itens que ficarão negativos, por exemplo) e precisam quebrar */}
+        <p className="text-crunch-ink-dim text-sm mb-8 leading-relaxed whitespace-pre-line max-h-[50vh] overflow-y-auto">
+          {message}
+        </p>
 
         <div className="flex gap-3 justify-end">
           <button

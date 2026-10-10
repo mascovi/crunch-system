@@ -3,28 +3,39 @@ import { buscarSaldoCodigo } from './estoque'
 import type { EnvioFull, EnvioFullItem, CSVFullItem, CSVFullHeader } from '@/types'
 
 /**
- * Valida os itens do CSV FULL contra o estoque disponível.
- * Retorna erros encontrados.
+ * Confere os itens do CSV FULL contra o estoque disponível.
+ *
+ * ISSO NAO BLOQUEIA O ENVIO. Saldo insuficiente e informacao, nao impedimento:
+ * o produto JA saiu fisicamente do galpao quando o Mercado Livre o recebeu, e
+ * travar o lancamento nao desfaz isso — so faz a plataforma mentir, ficando
+ * com saldo que nao existe mais na prateleira. Saldo negativo e a leitura
+ * correta de "sai mais do que o sistema sabia que tinha", e aponta para a
+ * causa real: entrada de NF que faltou lancar, ou contagem errada.
+ *
+ * Retorna avisos para a tela exibir antes de confirmar.
  */
 export async function validarCSVFull(itens: CSVFullItem[]): Promise<string[]> {
-  const erros: string[] = []
+  const avisos: string[] = []
 
   for (const item of itens) {
     if (!item.codigo_ml) {
-      erros.push(`Linha com Código ML vazio.`)
+      avisos.push(`Linha com Código ML vazio.`)
       continue
     }
 
     const saldo = await buscarSaldoCodigo(item.codigo_ml)
+    const nome = item.descricao || '?'
 
-    if (saldo <= 0) {
-      erros.push(`${item.codigo_ml} (${item.descricao || '?'}): sem saldo em estoque (saldo: ${saldo}).`)
-    } else if (item.quantidade > saldo) {
-      erros.push(`${item.codigo_ml} (${item.descricao || '?'}): quantidade (${item.quantidade}) excede saldo (${saldo}).`)
+    if (item.quantidade > saldo) {
+      const ficara = saldo - item.quantidade
+      avisos.push(
+        `${item.codigo_ml} (${nome}): saldo ${saldo}, saindo ${item.quantidade} — ` +
+          `ficara em ${ficara}.`
+      )
     }
   }
 
-  return erros
+  return avisos
 }
 
 /**

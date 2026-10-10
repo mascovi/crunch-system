@@ -260,10 +260,15 @@ function TabEstoque() {
         nomeCurto.toLowerCase().includes(alvo)
       const matchFornecedor = !filtroFornecedor || item.fornecedor_principal === filtroFornecedor
       // Zerados ficam fora por padrão: a lista do dia a dia é do que existe.
-      // Quando a busca é por um código específico, mostra mesmo zerado — quem
-      // procura "ALWO97425" quer saber que ele está zerado, não que sumiu.
+      // NEGATIVO NUNCA É ESCONDIDO — saldo negativo é anomalia (saiu mais do
+      // que o sistema sabia que tinha, quase sempre entrada de NF que faltou
+      // lançar) e esconder isso é o oposto do que serve.
+      // Durante a busca, zerado também aparece: quem procura "ALWO97425" quer
+      // saber que ele está zerado, não que sumiu.
       const matchZerado =
-        mostrarZerados || busca.trim().length > 0 || item.quantidade_disponivel > 0
+        mostrarZerados ||
+        busca.trim().length > 0 ||
+        item.quantidade_disponivel !== 0
       return matchBusca && matchFornecedor && matchZerado
     })
 
@@ -296,7 +301,9 @@ function TabEstoque() {
   const totalUnidades = estoque.reduce((s, i) => s + i.quantidade_disponivel, 0)
   const valorTotal = estoque.reduce((s, i) => s + (i.preco_compra * Math.max(0, i.quantidade_disponivel)), 0)
   const alertaCount = estoque.filter((i) => i.quantidade_disponivel < 10).length
-  const zeradoCount = estoque.filter((i) => i.quantidade_disponivel <= 0).length
+  // Exatamente zero — é o que o filtro esconde. Negativo fica sempre visível.
+  const zeradoCount = estoque.filter((i) => i.quantidade_disponivel === 0).length
+  const negativoCount = estoque.filter((i) => i.quantidade_disponivel < 0).length
 
   // Unidades por fornecedor. Saldo negativo não entra na soma: ele é erro de
   // inventário, e somar negativo faria um fornecedor parecer menor do que é.
@@ -906,7 +913,9 @@ function TabEstoque() {
           </div>
           <div className={`text-2xl font-bold ${alertaCount > 0 ? 'text-red-700' : 'text-gray-900'}`}>{alertaCount}</div>
           <p className={`text-xs mt-1 ${alertaCount > 0 ? 'text-red-500' : 'text-gray-400'}`}>
-            {zeradoCount > 0 ? `${zeradoCount} zerado${zeradoCount > 1 ? 's' : ''} · ` : ''}{alertaCount} abaixo de 10
+            {negativoCount > 0 ? `${negativoCount} negativo${negativoCount > 1 ? 's' : ''} · ` : ''}
+            {zeradoCount > 0 ? `${zeradoCount} zerado${zeradoCount > 1 ? 's' : ''} · ` : ''}
+            {alertaCount} abaixo de 10
           </p>
         </div>
       </div>
@@ -2362,6 +2371,9 @@ function TabEnviarFull() {
   const [step, setStep] = useState<'upload' | 'preview' | 'success'>('upload')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [processing, setProcessing] = useState(false)
+  /** Itens que vão ficar com saldo negativo. Avisa, não bloqueia. */
+  const [avisosSaldo, setAvisosSaldo] = useState<string[]>([])
+  const [conferindo, setConferindo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // Caminho alternativo: colar o texto do Mercado Livre
   const [colarAberto, setColarAberto] = useState(false)
@@ -2444,14 +2456,9 @@ function TabEnviarFull() {
     setErrors([])
 
     try {
-      const validationErrors = await validarCSVFull(csvItens)
-      if (validationErrors.length > 0) {
-        setErrors(validationErrors)
-        setConfirmOpen(false)
-        setProcessing(false)
-        return
-      }
-
+      // Saldo insuficiente NAO bloqueia: o produto já saiu de verdade, e
+      // travar o lançamento só faria o sistema guardar saldo que não existe
+      // mais na prateleira. Os avisos já foram mostrados antes de confirmar.
       await processarEnvioFull(csvItens, csvHeader || undefined)
       setConfirmOpen(false)
       setStep('success')
@@ -2656,10 +2663,22 @@ function TabEnviarFull() {
               Cancelar
             </button>
             <button
-              onClick={() => setConfirmOpen(true)}
-              className="px-6 py-3 text-sm font-semibold rounded-xl bg-[#ff6a00] text-white hover:bg-orange-600 transition-colors shadow-sm"
+              onClick={async () => {
+                // Confere o saldo agora, só para avisar — nunca para impedir
+                setConferindo(true)
+                try {
+                  setAvisosSaldo(await validarCSVFull(csvItens))
+                } catch {
+                  setAvisosSaldo([])
+                } finally {
+                  setConferindo(false)
+                  setConfirmOpen(true)
+                }
+              }}
+              disabled={conferindo}
+              className="px-6 py-3 text-sm font-semibold rounded-xl bg-[#ff6a00] text-white hover:bg-orange-600 disabled:opacity-50 transition-colors shadow-sm"
             >
-              Confirmar Envio FULL
+              {conferindo ? 'Conferindo saldo...' : 'Confirmar Envio FULL'}
             </button>
           </div>
 
@@ -2668,7 +2687,14 @@ function TabEnviarFull() {
             onConfirm={handleEnviar}
             onCancel={() => setConfirmOpen(false)}
             title="Confirmar Envio FULL?"
-            message={`Serão registradas ${csvItens.length} saída(s) do estoque. Esta ação não pode ser desfeita.`}
+            message={
+              `Serão registradas ${csvItens.length} saída(s) do estoque. Esta ação não pode ser desfeita.` +
+              (avisosSaldo.length > 0
+                ? `\n\nAtenção — ${avisosSaldo.length} ${avisosSaldo.length === 1 ? 'item ficará' : 'itens ficarão'} com saldo negativo:\n` +
+                  avisosSaldo.map((a) => `· ${a}`).join('\n') +
+                  `\n\nIsso costuma significar que faltou lançar a entrada de uma NF. O envio segue normalmente — o negativo mostra o tamanho da diferença.`
+                : '')
+            }
           />
         </div>
       )}
