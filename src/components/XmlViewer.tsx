@@ -30,6 +30,23 @@ export default function XmlViewer({
    */
   const [produtos, setProdutos] = useState<Record<string, DadosProduto>>({})
 
+  /**
+   * Itens já conferidos, por id do item.
+   *
+   * POR QUE GRAVAR NO NAVEGADOR:
+   * Conferir uma descarga leva tempo — o celular apaga a tela, alguém fecha
+   * a janela sem querer, a página recarrega. Perder meia conferência e ter
+   * que recontar tudo é pior que o problema que isso resolve. Fica guardado
+   * por NF, então duas notas abertas no mesmo dia não se misturam.
+   *
+   * LIMITE: é por navegador. Se você confere no celular e seu irmão no
+   * computador, cada um vê os próprios checks. Para conferência a quatro
+   * mãos, isso precisaria ir para o banco.
+   */
+  const [conferidos, setConferidos] = useState<Record<string, boolean>>({})
+
+  const chaveConferencia = nota ? `conferencia-nf-${nota.id}` : ''
+
   useEffect(() => {
     if (!isOpen) return
     fetch('/api/sheets/produtos')
@@ -40,6 +57,42 @@ export default function XmlViewer({
       })
       .catch((e) => console.warn('[caixas] falha ao buscar:', e))
   }, [isOpen])
+
+  // Retoma a conferência de onde parou
+  useEffect(() => {
+    if (!isOpen || !chaveConferencia) return
+    try {
+      const salvo = window.localStorage.getItem(chaveConferencia)
+      setConferidos(salvo ? JSON.parse(salvo) : {})
+    } catch {
+      // localStorage pode estar bloqueado (aba anônima, política do
+      // navegador). A conferência segue funcionando, só não sobrevive ao
+      // fechamento da janela.
+      setConferidos({})
+    }
+  }, [isOpen, chaveConferencia])
+
+  const alternarConferido = (itemId: string) => {
+    setConferidos((atual) => {
+      const novo = { ...atual, [itemId]: !atual[itemId] }
+      if (!novo[itemId]) delete novo[itemId]
+      try {
+        window.localStorage.setItem(chaveConferencia, JSON.stringify(novo))
+      } catch {
+        /* sem persistência — a tela continua funcionando */
+      }
+      return novo
+    })
+  }
+
+  const limparConferencia = () => {
+    setConferidos({})
+    try {
+      window.localStorage.removeItem(chaveConferencia)
+    } catch {
+      /* idem */
+    }
+  }
 
   if (!isOpen || !nota) return null
 
@@ -72,6 +125,7 @@ export default function XmlViewer({
     soltas: number
   }[]
   const totalCaixas = comCaixas.reduce((s, c) => s + c.caixas + (c.soltas > 0 ? 1 : 0), 0)
+  const totalConferidos = itens.filter((i) => conferidos[i.id]).length
   const todosTemCaixa = comCaixas.length === itens.length && itens.length > 0
   const diferencaVolumes = todosTemCaixa ? totalCaixas - (nota.volumes || 0) : null
 
@@ -109,9 +163,35 @@ export default function XmlViewer({
 
           {/* Itens */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-crunch-ink-dim mb-4">
-              Itens da Nota ({itens.length})
-            </h4>
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-crunch-ink-dim">
+                Itens da Nota ({itens.length})
+              </h4>
+
+              {itens.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-xs font-medium ${
+                      totalConferidos === itens.length
+                        ? 'text-green-400'
+                        : 'text-crunch-ink-mute'
+                    }`}
+                  >
+                    {totalConferidos === itens.length
+                      ? '✓ Tudo conferido'
+                      : `${totalConferidos} de ${itens.length} conferidos`}
+                  </span>
+                  {totalConferidos > 0 && (
+                    <button
+                      onClick={limparConferencia}
+                      className="text-xs text-crunch-ink-mute hover:text-crunch-accent transition-colors"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             {loading ? (
               <div className="text-center py-8 text-crunch-ink-mute">Carregando itens...</div>
@@ -121,13 +201,37 @@ export default function XmlViewer({
               <div className="space-y-3">
                 {itens.map((item) => {
                   const cx = calcularCaixas(item)
+                  const conferido = Boolean(conferidos[item.id])
                   return (
                     <div
                       key={item.id}
-                      className="bg-crunch-panel border border-crunch-line rounded-xl p-4"
+                      onClick={() => alternarConferido(item.id)}
+                      className={`border rounded-xl p-4 cursor-pointer transition-colors select-none ${
+                        conferido
+                          ? 'bg-green-500/5 border-green-500/40'
+                          : 'bg-crunch-panel border-crunch-line hover:border-crunch-line-2'
+                      }`}
                     >
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <p className="text-sm font-medium leading-tight">{item.produto}</p>
+                      <div className="flex items-start gap-3 mb-2">
+                        {/* O cartão inteiro é clicável: conferência é feita
+                            de pé, com caixa na mão — alvo grande importa */}
+                        <span
+                          className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center text-xs font-bold transition-colors ${
+                            conferido
+                              ? 'bg-green-500 border-green-500 text-white'
+                              : 'border-crunch-line-2 text-transparent'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          &#10003;
+                        </span>
+                        <p
+                          className={`text-sm font-medium leading-tight flex-1 ${
+                            conferido ? 'text-crunch-ink-mute line-through' : ''
+                          }`}
+                        >
+                          {item.produto}
+                        </p>
                         <span className="shrink-0 text-xs font-mono bg-crunch-panel-2 border border-crunch-line-2 px-2 py-1 rounded text-crunch-accent">
                           {item.codigo_ml}
                         </span>
