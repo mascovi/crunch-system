@@ -116,11 +116,14 @@ function TabEstoque() {
   /** Produtos zerados ficam escondidos até você pedir para ver. */
   const [mostrarZerados, setMostrarZerados] = useState(false)
   /**
-   * Nome curto por código ML, vindo da coluna DESCRIÇÃO do BANCO_DE_DADOS.
-   * Carrega depois da tabela, sem travar a tela: se a planilha demorar ou
-   * falhar, o estoque continua aparecendo com o título do anúncio.
+   * Dados do BANCO_DE_DADOS por código ML: nome curto (coluna B) e itens por
+   * caixa (coluna F). Carrega depois da tabela, sem travar a tela: se a
+   * planilha demorar ou falhar, o estoque continua aparecendo com o título
+   * do anúncio e sem a conta de caixas.
    */
-  const [nomesCurtos, setNomesCurtos] = useState<Record<string, string>>({})
+  const [produtosPlanilha, setProdutosPlanilha] = useState<
+    Record<string, { nomeCurto: string; itensPorVolume: number }>
+  >({})
 
   // Modal Ajuste
   const [ajusteOpen, setAjusteOpen] = useState(false)
@@ -231,15 +234,15 @@ function TabEstoque() {
     carregarEstoque()
   }, [carregarEstoque])
 
-  // Nomes curtos da planilha — em paralelo, nunca bloqueando a tabela
+  // Dados da planilha — em paralelo, nunca bloqueando a tabela
   useEffect(() => {
-    fetch('/api/sheets/nomes-curtos')
+    fetch('/api/sheets/produtos')
       .then((r) => r.json())
       .then((d) => {
-        if (d.ok && d.nomes) setNomesCurtos(d.nomes)
-        else console.warn('[nomes curtos] indisponíveis:', d.error)
+        if (d.ok && d.produtos) setProdutosPlanilha(d.produtos)
+        else console.warn('[planilha] dados indisponíveis:', d.error)
       })
-      .catch((e) => console.warn('[nomes curtos] falha ao buscar:', e))
+      .catch((e) => console.warn('[planilha] falha ao buscar:', e))
   }, [])
 
   // Fornecedores
@@ -253,7 +256,7 @@ function TabEstoque() {
       const alvo = busca.toLowerCase()
       // Busca também pelo nome curto: quem vê "WHEY VEGAN PAÇOCA" na tela
       // digita isso, e não o título do anúncio que está lá embaixo.
-      const nomeCurto = nomesCurtos[item.codigo_ml.toUpperCase()] || ''
+      const nomeCurto = produtosPlanilha[item.codigo_ml.toUpperCase()]?.nomeCurto || ''
       const matchBusca =
         item.codigo_ml.toLowerCase().includes(alvo) ||
         item.produto.toLowerCase().includes(alvo) ||
@@ -293,7 +296,7 @@ function TabEstoque() {
     })
 
     return items
-  }, [estoque, busca, filtroFornecedor, sortCol, sortDir, mostrarZerados, nomesCurtos])
+  }, [estoque, busca, filtroFornecedor, sortCol, sortDir, mostrarZerados, produtosPlanilha])
 
   // KPIs
   // SKUs com saldo, não cadastrados: produto zerado não é estoque, é cadastro.
@@ -1112,7 +1115,20 @@ function TabEstoque() {
                   // fornecedor — o produto ainda precisa do código ML de verdade.
                   const semCodigoML = !ehCodigoML(item.codigo_ml)
                   // Nome curto da planilha. Sem ele, cai no título do anúncio.
-                  const nomeCurto = nomesCurtos[item.codigo_ml.toUpperCase()] || ''
+                  const daPlanilha = produtosPlanilha[item.codigo_ml.toUpperCase()]
+                  const nomeCurto = daPlanilha?.nomeCurto || ''
+                  // Caixas do saldo atual. Negativo não vira caixa: saldo
+                  // negativo é erro de inventário, e "-4 caixas" não existe
+                  // na prateleira — o que existe é uma diferença a apurar.
+                  const porCaixa = daPlanilha?.itensPorVolume || 0
+                  const caixas =
+                    porCaixa > 0 && item.quantidade_disponivel > 0
+                      ? {
+                          cheias: Math.floor(item.quantidade_disponivel / porCaixa),
+                          soltas: item.quantidade_disponivel % porCaixa,
+                          porCaixa,
+                        }
+                      : null
                   return (
                     <tr
                       key={item.codigo_ml}
@@ -1160,7 +1176,7 @@ function TabEstoque() {
                           {item.fornecedor_principal || '—'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
                         <span className={`font-bold text-base ${
                           item.quantidade_disponivel <= 0 ? 'text-red-600' :
                           item.quantidade_disponivel < 10 ? 'text-amber-600' :
@@ -1168,6 +1184,25 @@ function TabEstoque() {
                         }`}>
                           {item.quantidade_disponivel}
                         </span>
+                        {/* Quantas caixas esse saldo dá. Produto fora da
+                            planilha ou sem itens por caixa não mostra nada —
+                            melhor silêncio que palpite. */}
+                        {caixas && (
+                          <span
+                            className="block text-[11px] text-gray-400 mt-0.5 font-normal"
+                            title={`${caixas.porCaixa} unidades por caixa`}
+                          >
+                            {caixas.cheias > 0 && (
+                              <>
+                                {caixas.cheias} {caixas.cheias === 1 ? 'cx' : 'cxs'}
+                              </>
+                            )}
+                            {caixas.cheias > 0 && caixas.soltas > 0 && ' + '}
+                            {caixas.soltas > 0 && (
+                              <span className="text-amber-600">{caixas.soltas} un</span>
+                            )}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {item.quantidade_disponivel < 10 && (
