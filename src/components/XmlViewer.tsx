@@ -29,6 +29,17 @@ export default function XmlViewer({
    * aparecendo normalmente, só sem a contagem de caixas.
    */
   const [produtos, setProdutos] = useState<Record<string, DadosProduto>>({})
+  /**
+   * Estado da busca na planilha. Existe para a tela NÃO dizer "sem itens por
+   * caixa" enquanto a resposta não chegou — num celular em 4G essa chamada
+   * demora segundos, e a mensagem de "não encontrei" aparecia como se fosse
+   * conclusão definitiva. Quem lê acha que falta cadastro, e vai procurar
+   * problema onde não tem.
+   */
+  const [statusProdutos, setStatusProdutos] = useState<'carregando' | 'ok' | 'erro'>(
+    'carregando'
+  )
+  const [erroProdutos, setErroProdutos] = useState('')
 
   /**
    * Itens já conferidos, por id do item.
@@ -49,13 +60,25 @@ export default function XmlViewer({
 
   useEffect(() => {
     if (!isOpen) return
+    setStatusProdutos('carregando')
+    setErroProdutos('')
     fetch('/api/sheets/produtos')
       .then((r) => r.json())
       .then((d) => {
-        if (d.ok && d.produtos) setProdutos(d.produtos)
-        else console.warn('[caixas] indisponíveis:', d.error)
+        if (d.ok && d.produtos) {
+          setProdutos(d.produtos)
+          setStatusProdutos('ok')
+        } else {
+          console.warn('[caixas] indisponíveis:', d.error)
+          setErroProdutos(d.error || 'A planilha não respondeu.')
+          setStatusProdutos('erro')
+        }
       })
-      .catch((e) => console.warn('[caixas] falha ao buscar:', e))
+      .catch((e) => {
+        console.warn('[caixas] falha ao buscar:', e)
+        setErroProdutos(e instanceof Error ? e.message : String(e))
+        setStatusProdutos('erro')
+      })
   }, [isOpen])
 
   // Retoma a conferência de onde parou
@@ -193,6 +216,23 @@ export default function XmlViewer({
               )}
             </div>
 
+            {/* Falha na planilha aparece uma vez, com o motivo — em vez de
+                cada item dizer "não cadastrado" e mandar você procurar
+                problema no cadastro que está certo. */}
+            {statusProdutos === 'erro' && (
+              <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+                <p className="text-xs font-medium text-amber-300">
+                  Não consegui ler o BANCO_DE_DADOS
+                </p>
+                <p className="mt-1 font-mono text-[10px] leading-relaxed text-amber-400/80 break-words">
+                  {erroProdutos}
+                </p>
+                <p className="mt-1.5 text-[11px] text-amber-400/70">
+                  A nota está certa — só a contagem de caixas que não dá para calcular agora.
+                </p>
+              </div>
+            )}
+
             {loading ? (
               <div className="text-center py-8 text-crunch-ink-mute">Carregando itens...</div>
             ) : itens.length === 0 ? (
@@ -252,6 +292,14 @@ export default function XmlViewer({
                             ({cx.porCaixa} por caixa)
                           </span>
                         </div>
+                      ) : statusProdutos === 'carregando' ? (
+                        <p className="text-[11px] text-crunch-ink-mute mb-2 animate-pulse">
+                          Calculando caixas…
+                        </p>
+                      ) : statusProdutos === 'erro' ? (
+                        <p className="text-[11px] text-amber-400 mb-2">
+                          Não consegui ler a planilha para calcular as caixas.
+                        </p>
                       ) : (
                         <p className="text-[11px] text-crunch-ink-mute mb-2">
                           Sem itens por caixa no BANCO_DE_DADOS — não dá para calcular.
