@@ -2,8 +2,15 @@
  * Telegram Bot API — serviço de notificações do Crunch System.
  *
  * Variáveis de ambiente necessárias:
- *   TELEGRAM_BOT_TOKEN  — token do BotFather
- *   TELEGRAM_CHAT_ID    — chat_id do destinatário (pessoa ou grupo)
+ *   TELEGRAM_BOT_TOKEN          — token do BotFather
+ *   TELEGRAM_CHAT_ID            — destinatário padrão (NF nova, entregas previstas)
+ *   TELEGRAM_CHAT_ID_ENTREGUE   — destinatário do aviso de NF entregue
+ *
+ * SOBRE O SEGUNDO DESTINATÁRIO:
+ * Ele NÃO cai de volta no TELEGRAM_CHAT_ID quando está vazio. Um fallback
+ * silencioso aqui mandaria o aviso para a pessoa errada e ninguém perceberia —
+ * a mensagem chegaria, só que para quem não devia. Faltando a variável, o
+ * envio falha com o motivo na tela.
  */
 
 /**
@@ -21,6 +28,7 @@ function lerCredenciais() {
   return {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
     chatId: process.env.TELEGRAM_CHAT_ID || '',
+    chatIdEntregue: process.env.TELEGRAM_CHAT_ID_ENTREGUE || '',
   }
 }
 
@@ -42,14 +50,20 @@ export interface EnvioResult {
  */
 export async function enviarMensagemTelegramDetalhado(
   texto: string,
-  parseMode: 'HTML' | 'MarkdownV2' = 'HTML'
+  parseMode: 'HTML' | 'MarkdownV2' = 'HTML',
+  /**
+   * Para quem mandar. Omitido = destinatário padrão (TELEGRAM_CHAT_ID).
+   * Quem passa um valor explícito já resolveu de onde ele veio.
+   */
+  destinatario?: string
 ): Promise<EnvioResult> {
   const { botToken, chatId } = lerCredenciais()
+  const alvo = destinatario !== undefined ? destinatario : chatId
 
-  if (!botToken || !chatId) {
+  if (!botToken || !alvo) {
     const faltando = [
       !botToken && 'TELEGRAM_BOT_TOKEN',
-      !chatId && 'TELEGRAM_CHAT_ID',
+      !alvo && (destinatario !== undefined ? 'destinatario' : 'TELEGRAM_CHAT_ID'),
     ]
       .filter(Boolean)
       .join(' e ')
@@ -64,7 +78,7 @@ export async function enviarMensagemTelegramDetalhado(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: alvo,
         text: texto,
         parse_mode: parseMode,
       }),
@@ -124,6 +138,76 @@ export async function notificarNovaNF(dados: {
   ].join('\n')
 
   return enviarMensagemTelegramDetalhado(msg)
+}
+
+/**
+ * Avisa que uma NF foi marcada como entregue.
+ *
+ * Vai para o TELEGRAM_CHAT_ID_ENTREGUE — um destinatário separado do padrão,
+ * porque quem confere recebimento não é necessariamente quem acompanha o
+ * cadastro de notas. Sem essa variável o envio falha em vez de cair no
+ * destinatário padrão: mandar para a pessoa errada seria pior que não mandar,
+ * porque ninguém perceberia o engano.
+ */
+export async function notificarNFEntregue(dados: {
+  numero_nf: string
+  fornecedor: string
+  transportadora: string
+  volumes: number
+  data_emissao?: string
+  dias_em_transito?: number | null
+  itens: { produto: string; quantidade: number }[]
+}): Promise<EnvioResult> {
+  const { chatIdEntregue } = lerCredenciais()
+
+  if (!chatIdEntregue) {
+    const msg = 'Variavel de ambiente ausente: TELEGRAM_CHAT_ID_ENTREGUE'
+    console.warn('[Telegram]', msg)
+    return { ok: false, error: msg }
+  }
+
+  const totalUnidades = dados.itens.reduce((s, i) => s + (i.quantidade || 0), 0)
+
+  // Lista longa vira resumo: mensagem do Telegram tem limite de 4096
+  // caracteres, e NF com 40 itens estoura isso e some sem avisar.
+  const LIMITE = 15
+  const listaItens = dados.itens
+    .slice(0, LIMITE)
+    .map((it) => `  • ${it.produto} (×${it.quantidade})`)
+    .join('\n')
+  const resto =
+    dados.itens.length > LIMITE
+      ? `\n  … e mais ${dados.itens.length - LIMITE} ${
+          dados.itens.length - LIMITE === 1 ? 'item' : 'itens'
+        }`
+      : ''
+
+  const linhas = [
+    '✅ <b>Nota Fiscal Entregue</b>',
+    '',
+    `<b>NF:</b> ${dados.numero_nf}`,
+    `<b>Fornecedor:</b> ${dados.fornecedor}`,
+    `<b>Transportadora:</b> ${dados.transportadora || 'Não informada'}`,
+    `<b>Volumes:</b> ${dados.volumes}`,
+  ]
+
+  if (dados.dias_em_transito !== undefined && dados.dias_em_transito !== null) {
+    linhas.push(
+      `<b>Em trânsito:</b> ${dados.dias_em_transito} ${
+        dados.dias_em_transito === 1 ? 'dia' : 'dias'
+      }`
+    )
+  }
+
+  linhas.push(
+    '',
+    `<b>Entrada no estoque — ${dados.itens.length} ${
+      dados.itens.length === 1 ? 'item' : 'itens'
+    }, ${totalUnidades} ${totalUnidades === 1 ? 'unidade' : 'unidades'}:</b>`,
+    listaItens + resto
+  )
+
+  return enviarMensagemTelegramDetalhado(linhas.join('\n'), 'HTML', chatIdEntregue)
 }
 
 /**

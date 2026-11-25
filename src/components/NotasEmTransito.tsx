@@ -30,6 +30,8 @@ export default function NotasEmTransito() {
 
   // Aviso flutuante do rastreio
   const [avisoRastreio, setAvisoRastreio] = useState('')
+  /** Resultado do aviso de Telegram ao marcar entrega. Fica na tela até fechar. */
+  const [avisoTelegram, setAvisoTelegram] = useState('')
 
   const carregarNotas = useCallback(async () => {
     try {
@@ -77,14 +79,70 @@ export default function NotasEmTransito() {
     setConfirmOpen(true)
   }
 
+  /**
+   * Confirma o recebimento e avisa no Telegram.
+   *
+   * A ORDEM IMPORTA: primeiro a entrada no estoque, depois o aviso. Se o
+   * Telegram falhar, o recebimento já está registrado e só o aviso se perde —
+   * o contrário seria bem pior.
+   *
+   * O envio é feito por uma rota de API porque o token do bot não pode chegar
+   * ao navegador. E a falha aparece NA TELA, não só no console: foi justamente
+   * uma notificação falhando em silêncio que nos custou uma sessão inteira de
+   * depuração.
+   */
   const handleConfirmarRecebimento = async () => {
     if (!confirmNota) return
+    const nota = confirmNota
     setConfirmLoading(true)
+    setAvisoTelegram('')
     try {
-      await confirmarRecebimento(confirmNota.id)
+      const itens = await buscarItensNF(nota.id)
+
+      await confirmarRecebimento(nota.id)
       setConfirmOpen(false)
       setConfirmNota(null)
       await carregarNotas()
+
+      // Dias em trânsito, quando dá para calcular
+      let dias: number | null = null
+      if (nota.data_emissao) {
+        const ms = Date.now() - new Date(nota.data_emissao).getTime()
+        const d = Math.floor(ms / 86400000)
+        if (Number.isFinite(d) && d >= 0) dias = d
+      }
+
+      try {
+        const res = await fetch('/api/notas-fiscais/entregue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            numero_nf: nota.numero_nf,
+            fornecedor: nota.fornecedor,
+            transportadora: nota.transportadora || '',
+            volumes: nota.volumes,
+            data_emissao: nota.data_emissao,
+            dias_em_transito: dias,
+            itens: itens.map((i) => ({ produto: i.produto, quantidade: i.quantidade })),
+          }),
+        })
+        const data = await res.json()
+        console.log('[Telegram entregue]', res.status, data)
+
+        if (data.ok) {
+          setAvisoTelegram(`NF ${nota.numero_nf} recebida. Aviso enviado no Telegram.`)
+        } else {
+          setAvisoTelegram(
+            `NF ${nota.numero_nf} recebida e no estoque, mas o aviso no Telegram falhou: ` +
+              `${data.error || `HTTP ${res.status}`}${data.deploy ? ` [build ${data.deploy}]` : ''}`
+          )
+        }
+      } catch (e) {
+        setAvisoTelegram(
+          `NF ${nota.numero_nf} recebida e no estoque, mas não consegui falar com o servidor ` +
+            `para enviar o aviso: ${e instanceof Error ? e.message : String(e)}`
+        )
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao confirmar recebimento')
     } finally {
@@ -183,6 +241,32 @@ export default function NotasEmTransito() {
           <div className="px-6 py-3 bg-blue-900/20 text-blue-300 text-xs border-b border-crunch-line flex items-start gap-2">
             <span className="mt-px">&#8505;</span>
             <span>{avisoRastreio}</span>
+          </div>
+        )}
+
+        {/* Resultado do aviso de Telegram. Fica até você fechar — falha de
+            notificação que some sozinha é falha que ninguém vê. */}
+        {avisoTelegram && (
+          <div
+            className={`px-6 py-3 text-xs border-b border-crunch-line flex items-start gap-2 ${
+              avisoTelegram.includes('falhou') || avisoTelegram.includes('não consegui')
+                ? 'bg-amber-900/20 text-amber-300'
+                : 'bg-green-900/20 text-green-300'
+            }`}
+          >
+            <span className="mt-px">
+              {avisoTelegram.includes('falhou') || avisoTelegram.includes('não consegui')
+                ? '⚠'
+                : '✓'}
+            </span>
+            <span className="flex-1 break-words">{avisoTelegram}</span>
+            <button
+              onClick={() => setAvisoTelegram('')}
+              className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+              aria-label="Fechar aviso"
+            >
+              &#10005;
+            </button>
           </div>
         )}
 

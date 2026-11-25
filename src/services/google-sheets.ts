@@ -173,10 +173,24 @@ export interface ResultadoBanco {
  * Produto fora da planilha simplesmente nao aparece no mapa, e a tela cai
  * de volta para o titulo do anuncio.
  */
-export async function lerNomesCurtos(): Promise<{
+export interface DadosProduto {
+  /** Coluna B — nome curto em caixa alta */
+  nomeCurto: string
+  /** Coluna F — quantas unidades cabem numa caixa. 0 = nao informado. */
+  itensPorVolume: number
+}
+
+/**
+ * Le a tabela do BANCO_DE_DADOS indexada pelo codigo ML.
+ *
+ * Traz nome curto (coluna B) e itens por volume (coluna F) numa unica
+ * chamada — sao o mesmo intervalo da planilha, nao faz sentido bater duas
+ * vezes no Google para pegar colunas vizinhas.
+ */
+export async function lerDadosProdutos(): Promise<{
   ok: boolean
   error?: string
-  nomes?: Record<string, string>
+  produtos?: Record<string, DadosProduto>
 }> {
   const { clientEmail, privateKey, spreadsheetId } = lerCredenciais()
 
@@ -187,28 +201,54 @@ export async function lerNomesCurtos(): Promise<{
   try {
     const token = await obterToken(clientEmail, privateKey)
     const dados = await chamar(
-      `${URL_API}/${spreadsheetId}/values/${encodeURIComponent(`${ABA_BANCO}!B:D`)}`,
+      `${URL_API}/${spreadsheetId}/values/${encodeURIComponent(`${ABA_BANCO}!B:F`)}`,
       token
     )
     const linhas: string[][] = dados.values || []
-    const nomes: Record<string, string> = {}
+    const produtos: Record<string, DadosProduto> = {}
 
     for (let i = PRIMEIRA_LINHA_BANCO - 1; i < linhas.length; i++) {
       const linha = linhas[i] || []
-      // O intervalo comeca na coluna B, entao: [0]=DESCRICAO, [2]=codigo ML
+      // O intervalo comeca na coluna B:
+      // [0]=DESCRICAO  [1]=FORNECEDOR  [2]=codigo ML  [3]=VARIACAO  [4]=ITENS POR VOLUME
       const nomeCurto = String(linha[0] || '').trim()
       const codigo = String(linha[2] || '').trim().toUpperCase()
+      const porVolume = parseInt(String(linha[4] || '').replace(/\D/g, ''), 10)
+
       // Primeira ocorrencia vence, igual ao PROCV da planilha — assim a tela
-      // mostra o mesmo nome que a aba de envio usaria
-      if (codigo && nomeCurto && !nomes[codigo]) {
-        nomes[codigo] = nomeCurto
+      // mostra o mesmo dado que a aba de envio usaria
+      if (codigo && !produtos[codigo]) {
+        produtos[codigo] = {
+          nomeCurto,
+          itensPorVolume: Number.isFinite(porVolume) && porVolume > 0 ? porVolume : 0,
+        }
       }
     }
 
-    return { ok: true, nomes }
+    return { ok: true, produtos }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+/**
+ * So os nomes curtos. Mantido para a tela de estoque, que nao precisa do
+ * resto; por baixo usa a mesma leitura.
+ */
+export async function lerNomesCurtos(): Promise<{
+  ok: boolean
+  error?: string
+  nomes?: Record<string, string>
+}> {
+  const r = await lerDadosProdutos()
+  if (!r.ok || !r.produtos) return { ok: false, error: r.error }
+
+  const nomes: Record<string, string> = {}
+  Object.keys(r.produtos).forEach((codigo) => {
+    const n = r.produtos![codigo].nomeCurto
+    if (n) nomes[codigo] = n
+  })
+  return { ok: true, nomes }
 }
 
 /**

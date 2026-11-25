@@ -1,6 +1,12 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import type { ItemNF, NotaFiscal } from '@/types'
+
+interface DadosProduto {
+  nomeCurto: string
+  itensPorVolume: number
+}
 
 interface XmlViewerProps {
   isOpen: boolean
@@ -17,10 +23,57 @@ export default function XmlViewer({
   loading,
   onClose,
 }: XmlViewerProps) {
+  /**
+   * Itens por caixa, vindos da coluna F do BANCO_DE_DADOS.
+   * Carrega em paralelo: se a planilha demorar ou cair, a nota continua
+   * aparecendo normalmente, só sem a contagem de caixas.
+   */
+  const [produtos, setProdutos] = useState<Record<string, DadosProduto>>({})
+
+  useEffect(() => {
+    if (!isOpen) return
+    fetch('/api/sheets/produtos')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok && d.produtos) setProdutos(d.produtos)
+        else console.warn('[caixas] indisponíveis:', d.error)
+      })
+      .catch((e) => console.warn('[caixas] falha ao buscar:', e))
+  }, [isOpen])
+
   if (!isOpen || !nota) return null
 
   const totalValor = itens.reduce((sum, i) => sum + i.valor_total, 0)
   const totalQtd = itens.reduce((sum, i) => sum + i.quantidade, 0)
+
+  /**
+   * Caixas de um item. Devolve null quando o produto não está na planilha
+   * ou está sem itens por volume — nesse caso a tela não mostra palpite.
+   *
+   * O resto (unidades que não fecham uma caixa) é mostrado separado em vez
+   * de arredondado: 593 unidades a 6 por caixa são 98 caixas e 5 soltas, e
+   * quem está conferindo a descarga precisa saber das 5.
+   */
+  const calcularCaixas = (item: ItemNF) => {
+    const dados = produtos[(item.codigo_ml || '').toUpperCase()]
+    if (!dados || dados.itensPorVolume <= 0) return null
+    const porCaixa = dados.itensPorVolume
+    return {
+      porCaixa,
+      caixas: Math.floor(item.quantidade / porCaixa),
+      soltas: item.quantidade % porCaixa,
+    }
+  }
+
+  // Soma das caixas calculadas, para conferir contra os volumes declarados
+  const comCaixas = itens.map(calcularCaixas).filter(Boolean) as {
+    porCaixa: number
+    caixas: number
+    soltas: number
+  }[]
+  const totalCaixas = comCaixas.reduce((s, c) => s + c.caixas + (c.soltas > 0 ? 1 : 0), 0)
+  const todosTemCaixa = comCaixas.length === itens.length && itens.length > 0
+  const diferencaVolumes = todosTemCaixa ? totalCaixas - (nota.volumes || 0) : null
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -66,37 +119,103 @@ export default function XmlViewer({
               <div className="text-center py-8 text-crunch-ink-mute">Nenhum item encontrado.</div>
             ) : (
               <div className="space-y-3">
-                {itens.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-crunch-panel border border-crunch-line rounded-xl p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <p className="text-sm font-medium leading-tight">{item.produto}</p>
-                      <span className="shrink-0 text-xs font-mono bg-crunch-panel-2 border border-crunch-line-2 px-2 py-1 rounded text-crunch-accent">
-                        {item.codigo_ml}
-                      </span>
+                {itens.map((item) => {
+                  const cx = calcularCaixas(item)
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-crunch-panel border border-crunch-line rounded-xl p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <p className="text-sm font-medium leading-tight">{item.produto}</p>
+                        <span className="shrink-0 text-xs font-mono bg-crunch-panel-2 border border-crunch-line-2 px-2 py-1 rounded text-crunch-accent">
+                          {item.codigo_ml}
+                        </span>
+                      </div>
+
+                      {/* Caixas em destaque — é o número que serve na descarga */}
+                      {cx ? (
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <span className="text-lg font-bold text-crunch-accent">
+                            {cx.caixas} {cx.caixas === 1 ? 'caixa' : 'caixas'}
+                          </span>
+                          {cx.soltas > 0 && (
+                            <span className="text-xs text-amber-400">
+                              + {cx.soltas} {cx.soltas === 1 ? 'unidade solta' : 'unidades soltas'}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-crunch-ink-mute">
+                            ({cx.porCaixa} por caixa)
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-crunch-ink-mute mb-2">
+                          Sem itens por caixa no BANCO_DE_DADOS — não dá para calcular.
+                        </p>
+                      )}
+
+                      <div className="flex gap-4 text-xs text-crunch-ink-mute">
+                        <span>Qtd: <b className="text-crunch-ink-dim">{item.quantidade}</b></span>
+                        <span>Unit: <b className="text-crunch-ink-dim">R$ {item.valor_unitario.toFixed(2)}</b></span>
+                        <span>Total: <b className="text-crunch-ink-dim">R$ {item.valor_total.toFixed(2)}</b></span>
+                      </div>
                     </div>
-                    <div className="flex gap-4 text-xs text-crunch-ink-mute">
-                      <span>Qtd: <b className="text-crunch-ink-dim">{item.quantidade}</b></span>
-                      <span>Unit: <b className="text-crunch-ink-dim">R$ {item.valor_unitario.toFixed(2)}</b></span>
-                      <span>Total: <b className="text-crunch-ink-dim">R$ {item.valor_total.toFixed(2)}</b></span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
 
           {/* Resumo */}
           {itens.length > 0 && (
-            <div className="bg-crunch-panel-2 border border-crunch-line-2 rounded-xl p-4 flex justify-between text-sm">
-              <span className="text-crunch-ink-mute">
-                {itens.length} itens &middot; {totalQtd} unidades
-              </span>
-              <span className="font-semibold text-crunch-accent">
-                R$ {totalValor.toFixed(2)}
-              </span>
+            <div className="bg-crunch-panel-2 border border-crunch-line-2 rounded-xl p-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-crunch-ink-mute">
+                  {itens.length} itens &middot; {totalQtd} unidades
+                </span>
+                <span className="font-semibold text-crunch-accent">
+                  R$ {totalValor.toFixed(2)}
+                </span>
+              </div>
+
+              {comCaixas.length > 0 && (
+                <div className="pt-3 border-t border-crunch-line-2 flex items-center justify-between gap-3 flex-wrap">
+                  <span className="text-sm">
+                    <b className="text-crunch-ink">{totalCaixas}</b>{' '}
+                    <span className="text-crunch-ink-mute">
+                      {totalCaixas === 1 ? 'caixa no total' : 'caixas no total'}
+                      {!todosTemCaixa && ` (${comCaixas.length} de ${itens.length} itens)`}
+                    </span>
+                  </span>
+
+                  {/*
+                    Confere a conta contra o que o fornecedor declarou. Uma
+                    divergência grande significa que os itens por caixa da
+                    planilha estão errados, ou que o fornecedor embalou de um
+                    jeito diferente — e é melhor descobrir antes da descarga.
+                    Só compara quando TODOS os itens têm caixa; comparar uma
+                    soma parcial contra o total declarado acusaria diferença
+                    o tempo todo.
+                  */}
+                  {diferencaVolumes !== null && (
+                    <span
+                      className={`text-xs px-2 py-1 rounded border ${
+                        Math.abs(diferencaVolumes) <= 1
+                          ? 'text-green-400 border-green-500/30 bg-green-500/10'
+                          : 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+                      }`}
+                    >
+                      {Math.abs(diferencaVolumes) <= 1
+                        ? `Bate com os ${nota.volumes} volumes da nota`
+                        : `Nota declara ${nota.volumes} volumes — ${
+                            diferencaVolumes > 0 ? 'calculei' : 'faltam'
+                          } ${Math.abs(diferencaVolumes)} a ${
+                            diferencaVolumes > 0 ? 'mais' : 'menos'
+                          }`}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
