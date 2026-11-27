@@ -104,6 +104,14 @@ export default function NotasEmTransito() {
       setConfirmNota(null)
       await carregarNotas()
 
+      // A conferência cumpriu o papel — não precisa ficar ocupando espaço
+      // no navegador depois que a nota entrou
+      try {
+        window.localStorage.removeItem(`conferencia-nf-${nota.id}`)
+      } catch {
+        /* sem persistência disponível; nada a limpar */
+      }
+
       // Dias em trânsito, quando dá para calcular
       let dias: number | null = null
       if (nota.data_emissao) {
@@ -344,6 +352,22 @@ export default function NotasEmTransito() {
         itens={viewerItens}
         loading={viewerLoading}
         onClose={() => { setViewerOpen(false); setViewerNota(null) }}
+        /*
+          Confirmar sem voltar para a lista. Fecha a gaveta antes de abrir a
+          confirmação de propósito: os dois são overlay no mesmo nível, e
+          empilhar um sobre o outro deixaria o modal atrás do drawer em
+          alguns navegadores.
+        */
+        onConfirmarEntrega={
+          viewerNota
+            ? () => {
+                const nota = viewerNota
+                setViewerOpen(false)
+                setViewerNota(null)
+                handleEntregue(nota)
+              }
+            : undefined
+        }
       />
 
       {/* Modal de confirmacao */}

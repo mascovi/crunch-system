@@ -14,6 +14,11 @@ interface XmlViewerProps {
   itens: ItemNF[]
   loading: boolean
   onClose: () => void
+  /**
+   * Confirmar a entrega sem sair da conferência. Quando não vem, o rodapé
+   * com o botão não aparece — é o caso das notas já entregues.
+   */
+  onConfirmarEntrega?: () => void
 }
 
 export default function XmlViewer({
@@ -22,6 +27,7 @@ export default function XmlViewer({
   itens,
   loading,
   onClose,
+  onConfirmarEntrega,
 }: XmlViewerProps) {
   /**
    * Itens por caixa, vindos da coluna F do BANCO_DE_DADOS.
@@ -371,6 +377,43 @@ export default function XmlViewer({
             </div>
           )}
         </div>
+
+        {/*
+          Rodapé fixo com a confirmação de entrega.
+
+          Fica SEMPRE visível, não só depois de tudo conferido: tem dia que
+          você quer dar entrada e conferir depois, e esconder o botão
+          obrigaria a fechar a gaveta e procurar a nota na lista de novo —
+          exatamente o caminho que esta tela veio encurtar.
+
+          O que muda com a conferência é o PESO do botão: apagado enquanto
+          falta item, laranja cheio quando fecha. O aviso diz quantos faltam,
+          então a informação está lá sem virar bloqueio.
+        */}
+        {onConfirmarEntrega && (
+          <div className="sticky bottom-0 bg-crunch-bg/95 backdrop-blur border-t border-crunch-line p-4 space-y-2">
+            {itens.length > 0 && totalConferidos < itens.length && (
+              <p className="text-[11px] text-crunch-ink-mute text-center">
+                {itens.length - totalConferidos}{' '}
+                {itens.length - totalConferidos === 1
+                  ? 'item ainda não conferido'
+                  : 'itens ainda não conferidos'}
+              </p>
+            )}
+            <button
+              onClick={onConfirmarEntrega}
+              className={`w-full py-3.5 text-sm font-semibold rounded-xl transition-colors ${
+                itens.length > 0 && totalConferidos === itens.length
+                  ? 'bg-green-600 hover:bg-green-700 text-white shadow-sm'
+                  : 'border border-crunch-line-2 text-crunch-ink-dim hover:border-crunch-accent hover:text-crunch-accent'
+              }`}
+            >
+              {itens.length > 0 && totalConferidos === itens.length
+                ? '✓ Confirmar entrega e dar entrada no estoque'
+                : 'Confirmar entrega e dar entrada no estoque'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
